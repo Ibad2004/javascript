@@ -1,0 +1,14 @@
+{
+  "name": "javascript",
+  "version": "1.0.0",
+  "description": "Daily JavaScript, React and Next.js exercises",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node day-01/index.js",
+    "day": "node"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

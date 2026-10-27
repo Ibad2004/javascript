@@ -18,3 +18,4 @@ node day-01/index.js
 
 - `git --version`, `node -v` and `npm -v` print the installed versions.
 - `git status` shows what has changed since the last commit.
+

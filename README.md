@@ -73,3 +73,5 @@ npm start
 | Day | Topic | Folder |
 | --- | --- | --- |
 | 01 | Environment setup, first script | [day-01](day-01/) |
+| 02 | JS basics: let/const, functions, arrow functions, objects, arrays | [day-02](day-02/) |
+| 03 | Array methods, destructuring, spread/rest | [day-03](day-03/) |

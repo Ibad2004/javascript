@@ -76,3 +76,4 @@ npm start
 | 02 | JS basics: let/const, functions, arrow functions, objects, arrays | [day-02](day-02/) |
 | 03 | Array methods, destructuring, spread/rest | [day-03](day-03/) |
 | 04 | Modules, closures, this | [day-04](day-04/) |
+| 05 | Event loop, timers, debounce and throttle | [day-05](day-05/) |

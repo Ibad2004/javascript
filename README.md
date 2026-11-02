@@ -77,3 +77,4 @@ npm start
 | 03 | Array methods, destructuring, spread/rest | [day-03](day-03/) |
 | 04 | Modules, closures, this | [day-04](day-04/) |
 | 05 | Event loop, timers, debounce and throttle | [day-05](day-05/) |
+| 06 | Promises, async/await, fetch, error handling | [day-06](day-06/) |

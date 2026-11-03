@@ -27,4 +27,4 @@ Player.prototype.attack = function (target) {
   return this._describeAttack(enemy);
 };
 
-module.export = Player;
+module.exports = Player;

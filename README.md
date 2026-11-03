@@ -78,3 +78,4 @@ npm start
 | 04 | Modules, closures, this | [day-04](day-04/) |
 | 05 | Event loop, timers, debounce and throttle | [day-05](day-05/) |
 | 06 | Promises, async/await, fetch, error handling | [day-06](day-06/) |
+| 07 | Debugging: breakpoints, Node inspector, stack traces | [day-07](day-07/) |

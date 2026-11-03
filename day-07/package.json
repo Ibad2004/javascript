@@ -1,0 +1,14 @@
+{
+  "name": "debug-adventure",
+  "version": "1.0.0",
+  "description": "Debugging practice: a small Node adventure game with planted bugs",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test": "jest --verbose"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}

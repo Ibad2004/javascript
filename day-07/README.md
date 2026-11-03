@@ -269,7 +269,14 @@ Player.prototype.attack = function (target) {
 | 4 | `enemy is not defined` | Stack trace | Undefined name `enemy` | Pass `target` |
 | 5 | Would crash on `this.target.name` | Reading the code after bug 4 | Player never stores a target | `_describeAttack(target)` uses `target.name` |
 
-Each fix is its own commit, so the exact change for every bug can be seen in the git history.
+The git history shows the buggy starter and each fix:
+
+| Commit | What it contains |
+| --- | --- |
+| `Day 07: buggy starter from debug-adventure` | The original `bugs` branch, unchanged |
+| `Day 07: fix bug 1 - module.export typo in player.js` | Bug 1 only |
+| `Day 07: fix bugs 4 and 5 - ...` | Bugs 2, 3, 4 and 5. I forgot to commit bugs 2 and 3 on their own, so they ended up in this commit even though its title only names 4 and 5. |
+| `Day 07: fix bugs 4 and 5, add README` | Only this README and the Progress row (no code) |
 
 ### Two oddities left as they are
 
@@ -294,7 +301,8 @@ The tests do not check these, and they do not break anything, so I did not chang
    only when I want to pause.
 3. **I fixed bug 1 before committing the buggy starter.** I put the bug back, committed the
    starter, then re-applied the fix as its own commit, so the history shows the exact
-   one-letter change.
+   one-letter change. Later I forgot to commit bugs 2 and 3 separately, so they share a commit
+   with bugs 4 and 5 (see the commit table above). Next time: commit right after each fix.
 4. **My first fix for bug 3 was wrong.** I removed `this.` like in bug 2, but `attack` has no
    `weapon` input. Looking at `this` while paused showed the sword is in `equippedWeapon`.
 5. **I first looked in the wrong files.** I compared the end of the **test** files instead of

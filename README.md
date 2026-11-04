@@ -79,3 +79,4 @@ npm start
 | 05 | Event loop, timers, debounce and throttle | [day-05](day-05/) |
 | 06 | Promises, async/await, fetch, error handling | [day-06](day-06/) |
 | 07 | Debugging: breakpoints, Node inspector, stack traces | [day-07](day-07/) |
+| 08 | TypeScript: types, interfaces, unions, generics, narrowing | [day-08](day-08/) |

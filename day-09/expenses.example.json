@@ -1,0 +1,19 @@
+{
+  "nextId": 3,
+  "expenses": [
+    {
+      "id": 1,
+      "amount": 450,
+      "description": "Lunch",
+      "category": "food",
+      "date": "2026-11-05T09:30:00.000Z"
+    },
+    {
+      "id": 2,
+      "amount": 120.5,
+      "description": "Bus fare",
+      "category": "transport",
+      "date": "2026-11-05T12:15:00.000Z"
+    }
+  ]
+}

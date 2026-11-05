@@ -80,3 +80,4 @@ npm start
 | 06 | Promises, async/await, fetch, error handling | [day-06](day-06/) |
 | 07 | Debugging: breakpoints, Node inspector, stack traces | [day-07](day-07/) |
 | 08 | TypeScript: types, interfaces, unions, generics, narrowing | [day-08](day-08/) |
+| 09 | npm, scripts, ESLint, Prettier: expense-tracker CLI | [day-09](day-09/) |

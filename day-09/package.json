@@ -1,0 +1,31 @@
+{
+  "name": "day-09-expense-tracker",
+  "version": "1.0.0",
+  "description": "Expense-tracker CLI in strict TypeScript with ESLint and Prettier",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "prestart": "npm run build",
+    "start": "node dist/src/cli.js",
+    "test": "npm run build && node --test dist/tests/*.test.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^26.6.6",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.10",
+    "typescript": "~6.0.0",
+    "typescript-eslint": "^8.72.1"
+  }
+}

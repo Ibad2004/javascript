@@ -12,19 +12,50 @@ runs from one `npm run check`.
 
 All commands run from `day-09/`. `npm start` builds first (the `prestart` script), then runs the CLI.
 
-| Command                                                 | Example                                         |
-| ------------------------------------------------------- | ----------------------------------------------- |
-| `add <amount> <description> [category]`                 | `npm start -- add 450 "Lunch with team" food`   |
-| `list [category]`                                       | `npm start -- list` or `npm start -- list food` |
-| `total`                                                 | `npm start -- total`                            |
-| `delete <id>`                                           | `npm start -- delete 2`                         |
-| `help` (also `--help`, `-h`, no command; unknown → `1`) | `npm start -- --help`                           |
+| Command                                                           | Example                                                      |
+| ----------------------------------------------------------------- | ------------------------------------------------------------ |
+| `add <amount> <description> [category]`                           | `npm start -- add 450 "Lunch with team" food`                |
+| `edit <id> [--amount X] [--description "text"] [--category name]` | `npm start -- edit 2 --amount 150`                           |
+| `list [category]`                                                 | `npm start -- list` or `npm start -- list food`              |
+| `total [--month YYYY-MM]`                                         | `npm start -- total` or `npm start -- total --month 2026-11` |
+| `delete <id>`                                                     | `npm start -- delete 2`                                      |
+| `export <file.csv> [--force]`                                     | `npm start -- export expenses.csv`                           |
+| `help` (also `--help`, `-h`, no command; unknown → `1`)           | `npm start -- --help`                                        |
 
 - Category defaults to `other` and is trimmed and lowercased (`" Food "` → `food`).
 - Amount must be a positive number with at most 2 decimals. Totals are added in whole paisa.
 - Quote a description that has spaces. Exit code is `0` on success, `1` on bad input.
+- `edit` changes only the fields you give and keeps the id and date. It uses the same rules as `add`, but a
+  blank `--category` is an error instead of falling back to `other`. Unknown options, a missing value and the
+  same option twice are errors, and the data file is not changed.
+- `total --month` uses the month of the saved UTC date. A month with no expenses prints
+  `No expenses in 2026-12` and `Total: 0.00`.
+- `export` writes `id,date,category,amount,description` with `\r\n` line endings. The path is relative to
+  `day-09/` (where npm runs the script), and `*.csv` there is git-ignored. Values with commas, quotes or new
+  lines are quoted, and quotes are doubled. A cell starting with `=`, `+`, `-`, `@`, tab or carriage return
+  gets a leading `'` so a spreadsheet does not run it as a formula. An existing file is never overwritten
+  unless you add `--force`.
 - Data lives in `data/expenses.json` (git-ignored, created on the first `add`). `expenses.example.json` shows
   the shape. Set `EXPENSES_FILE` to use another file (the CLI tests do this).
+
+Help text (`npm start -- help`):
+
+```text
+Usage: npm start -- <command>
+
+Commands:
+  add <amount> <description> [category]   Add an expense (category defaults to "other")
+  edit <id> [--amount X] [--description "text"] [--category name]
+                                          Change only the given fields of an expense
+  list [category]                         Show expenses, optionally for one category
+  total [--month YYYY-MM]                 Show the overall total and the total per category,
+                                          optionally for one month (UTC)
+  delete <id>                             Delete an expense by id
+  export <file.csv> [--force]             Save all expenses as CSV (--force overwrites the file)
+  help, --help, -h                        Show this help
+
+Example: npm start -- add 450 "Lunch with team" food
+```
 
 ## npm and the package.json scripts
 
@@ -62,13 +93,15 @@ disagrees with Prettier. `no-console` is an error everywhere except `src/cli.ts`
 ```text
 day-09/
 ├── src/
-│   ├── config.ts          one frozen config object: data file, default category, max decimals, max amount
-│   ├── expenses.ts        pure logic: parse and validate input, add, delete, filter, totals, formatting
-│   ├── storage.ts         file I/O: load (missing → empty, bad JSON/shape → error), safe save, shape check
-│   └── cli.ts             parses arguments, calls the functions above, prints, sets the exit code
+│   ├── config.ts          one frozen config object: data file, limits, month pattern, CSV rules
+│   ├── expenses.ts        pure logic: parse and validate input, add, edit, delete, filter, totals, formatting
+│   ├── export.ts          pure CSV logic: escaping, formula protection, file name check
+│   ├── storage.ts         file I/O: load (missing → empty, bad JSON/shape → error), safe save, safe export
+│   └── cli.ts             parses arguments and options, calls the functions above, prints, sets the exit code
 ├── tests/
 │   ├── expenses.test.ts   logic tests, no files and no CLI
-│   ├── storage.test.ts    load/save tests in a temp folder
+│   ├── export.test.ts     CSV tests, no files
+│   ├── storage.test.ts    load/save/export tests in a temp folder
 │   └── cli.test.ts        runs the built CLI as a child process to check output and exit codes
 ├── data/expenses.json     real data (git-ignored, created on first add)
 ├── expenses.example.json  committed sample of the data shape
@@ -102,33 +135,53 @@ export function toPaisa(amount: number): number {
 
 ## Edge cases → tests
 
-| Edge case                                 | Test                                                                                                  |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| amount `0`                                | `rejects amount 0`                                                                                    |
-| negative amount                           | `rejects a negative amount`                                                                           |
-| `"abc"`                                   | `rejects a non-number amount like abc`                                                                |
-| `"12.345"`                                | `rejects more than 2 decimals like 12.345`                                                            |
-| `Infinity`                                | `rejects Infinity`                                                                                    |
-| missing amount                            | `rejects a missing amount`                                                                            |
-| empty or blank description                | `rejects an empty or blank description`                                                               |
-| category trimmed and lowercased           | `trims and lowercases the category and defaults to other`                                             |
-| ids never reused                          | `never reuses an id after the highest one is deleted`                                                 |
-| delete id that doesn't exist              | `rejects an id that does not exist`                                                                   |
-| delete `"abc"`                            | `rejects a non-number id like abc`                                                                    |
-| delete with missing id                    | `rejects a missing id`                                                                                |
-| list with no expenses                     | `list with no expenses says No expenses yet`                                                          |
-| list a category with no expenses          | `list for a category with no expenses names that category` (prints `No expenses in category "nope".`) |
-| amount above 1,000,000,000                | `rejects an amount above the maximum instead of saving a rounded value`                               |
-| exactly the maximum amount                | `accepts the largest allowed amount exactly`                                                          |
-| amount above the maximum in the data file | `an amount above the maximum in the file gives a clear error`                                         |
-| `--help` and `-h`                         | `help, --help and -h show help and exit with code 0`                                                  |
-| total with no expenses                    | `total with no expenses is 0.00 and never NaN`                                                        |
-| `0.1 + 0.2`                               | `totals use whole paisa so 0.1 + 0.2 is exactly 0.30`                                                 |
-| missing data file                         | `a missing data file starts empty`                                                                    |
-| corrupted JSON                            | `corrupted JSON gives a clear error and does not overwrite the file`                                  |
-| wrong shape                               | `wrong shape in the file gives a clear error`, `rejects a bare array, duplicate ids and a bad date`   |
-| unknown command                           | `unknown command shows help and exits with code 1`                                                    |
-| bad amount from the CLI                   | `bad amount exits with code 1 and saves nothing`                                                      |
+| Edge case                                                                   | Test                                                                                                                                |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| amount `0`                                                                  | `rejects amount 0`                                                                                                                  |
+| negative amount                                                             | `rejects a negative amount`                                                                                                         |
+| `"abc"`                                                                     | `rejects a non-number amount like abc`                                                                                              |
+| `"12.345"`                                                                  | `rejects more than 2 decimals like 12.345`                                                                                          |
+| `Infinity`                                                                  | `rejects Infinity`                                                                                                                  |
+| missing amount                                                              | `rejects a missing amount`                                                                                                          |
+| empty or blank description                                                  | `rejects an empty or blank description`                                                                                             |
+| category trimmed and lowercased                                             | `trims and lowercases the category and defaults to other`                                                                           |
+| ids never reused                                                            | `never reuses an id after the highest one is deleted`                                                                               |
+| delete id that doesn't exist                                                | `rejects an id that does not exist`                                                                                                 |
+| delete `"abc"`                                                              | `rejects a non-number id like abc`                                                                                                  |
+| delete with missing id                                                      | `rejects a missing id`                                                                                                              |
+| list with no expenses                                                       | `list with no expenses says No expenses yet`                                                                                        |
+| list a category with no expenses                                            | `list for a category with no expenses names that category` (prints `No expenses in category "nope".`)                               |
+| amount above 1,000,000,000                                                  | `rejects an amount above the maximum instead of saving a rounded value`                                                             |
+| exactly the maximum amount                                                  | `accepts the largest allowed amount exactly`                                                                                        |
+| amount above the maximum in the data file                                   | `an amount above the maximum in the file gives a clear error`                                                                       |
+| `--help` and `-h`                                                           | `help, --help and -h show help and exit with code 0`                                                                                |
+| total with no expenses                                                      | `total with no expenses is 0.00 and never NaN`                                                                                      |
+| `0.1 + 0.2`                                                                 | `totals use whole paisa so 0.1 + 0.2 is exactly 0.30`                                                                               |
+| missing data file                                                           | `a missing data file starts empty`                                                                                                  |
+| corrupted JSON                                                              | `corrupted JSON gives a clear error and does not overwrite the file`                                                                |
+| wrong shape                                                                 | `wrong shape in the file gives a clear error`, `rejects a bare array, duplicate ids and a bad date`                                 |
+| unknown command                                                             | `unknown command shows help and exits with code 1`                                                                                  |
+| bad amount from the CLI                                                     | `bad amount exits with code 1 and saves nothing`                                                                                    |
+| edit only the given fields, keep id and date                                | `changes only the given fields and keeps id and date`                                                                               |
+| edit category trimmed and lowercased                                        | `trims and lowercases a new category and trims a new description`                                                                   |
+| edit with missing / `"abc"` / unknown id                                    | `edit rejects a missing, non-number or unknown id`                                                                                  |
+| edit with no fields                                                         | `edit rejects no fields`                                                                                                            |
+| edit with invalid new values                                                | `edit rejects invalid new values with the same rules as add`                                                                        |
+| edit `--price`, flag without value, flag twice, extra words; file unchanged | `bad edits exit with code 1 and leave the file unchanged`                                                                           |
+| `Edited #1: 150.00 Bus fare (transport)`                                    | `edit changes the given field and prints the edited expense`                                                                        |
+| month `2026-11` accepted                                                    | `accepts a YYYY-MM month`                                                                                                           |
+| month `2026-13`, `2026-1`, `26-11`, `abc`                                   | `rejects 2026-13, 2026-1, 26-11, abc and 2026-00`                                                                                   |
+| missing month                                                               | `rejects a missing month`, `total with a bad or missing month exits with code 1`                                                    |
+| only that month counted                                                     | `totals only the expenses of that month`                                                                                            |
+| month with no expenses                                                      | `a month with no expenses says so and totals 0.00, never NaN`                                                                       |
+| `total` without `--month` unchanged                                         | `total --month shows that month and an empty month says so`                                                                         |
+| CSV with no expenses                                                        | `no expenses gives the header row only`, `export with no expenses writes the header row and says so`                                |
+| CSV amount and date format                                                  | `writes amount with 2 decimals and date as YYYY-MM-DD`                                                                              |
+| CSV commas, quotes, new lines                                               | `quotes values with commas, quotes or new lines and doubles quotes`                                                                 |
+| CSV injection `= + - @`                                                     | `prefixes cells starting with = + - @ with a quote against CSV injection`, `protects the category column too`                       |
+| file name must end with `.csv`                                              | `rejects a missing name, another extension and a bare .csv`                                                                         |
+| no overwrite without `--force`                                              | `refuses to overwrite an existing file unless force is set`, `export writes a CSV, refuses to overwrite it, and --force overwrites` |
+| bad export arguments                                                        | `export with a bad file name or option exits with code 1`                                                                           |
 
 ## What broke and how I fixed it
 
@@ -152,6 +205,12 @@ export function toPaisa(amount: number): number {
    expenses exist.
 6. **`--help` was an "Unknown command".** People usually try `--help` or `-h` first, so both now show help
    with exit code `0`.
+7. **Day 10: the month check rejected every month.** I added `monthPattern` to `src/config.ts` with a shell
+   script, and the shell ate the backslash: the file had `/^d{4}-(0[1-9]|1[0-2])$/`, which wants a letter `d`
+   instead of 4 digits. I saw it in `git diff` before running the tests. **Fix:** wrote it back as
+   `/^\d{4}-(0[1-9]|1[0-2])$/` and added `accepts a YYYY-MM month`, which fails if this happens again. The CSV
+   settings (`"\t"`, `"\r\n"`) had the same problem and the same fix. Lesson: edit code with the editor, not
+   with shell quoting.
 
 ## What I learned
 
@@ -168,7 +227,8 @@ export function toPaisa(amount: number): number {
    `{ ok, error }`. Nothing here reads files or prints.
 2. **`src/storage.ts`** is the only disk access: missing file → empty list, bad file → clear error and the file
    is left alone, save goes through a temp file and `rename` so a crash can't leave half a file.
-3. **`src/cli.ts`** only turns arguments into function calls and results into text and an exit code.
-4. **`src/config.ts`** holds every setting in one object.
-5. **`tests/`** mirrors that split: logic, storage, and one file that runs the real CLI.
-6. **Tooling**: `npm run check` runs typecheck, lint, format check and 37 tests in one go.
+3. **`src/export.ts`** builds the CSV text as a pure function; `storage.ts` writes it.
+4. **`src/cli.ts`** only turns arguments and `--options` into function calls and results into text and an exit code.
+5. **`src/config.ts`** holds every setting in one object.
+6. **`tests/`** mirrors that split: logic, CSV, storage, and one file that runs the real CLI.
+7. **Tooling**: `npm run check` runs typecheck, lint, format check and 62 tests in one go.

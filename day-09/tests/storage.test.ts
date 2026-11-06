@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, test } from "node:test";
-import { loadStore, parseStore, saveStore } from "../src/storage.js";
+import { loadStore, parseStore, saveStore, writeExport } from "../src/storage.js";
 
 let dir = "";
 
@@ -70,5 +70,18 @@ describe("saveStore", () => {
     await saveStore(file, { nextId: 1, expenses: [] });
     assert.deepEqual(await readdir(join(dir, "data")), ["expenses.json"]);
     assert.deepEqual(await loadStore(file), { ok: true, value: { nextId: 1, expenses: [] } });
+  });
+});
+
+describe("writeExport", () => {
+  test("refuses to overwrite an existing file unless force is set", async () => {
+    const file = join(dir, "expenses.csv");
+    await writeFile(file, "old");
+    const refused = await writeExport(file, "new", false);
+    assert.ok(!refused.ok && refused.error.includes("Add --force"));
+    assert.equal(await readFile(file, "utf8"), "old");
+    assert.deepEqual(await writeExport(file, "new", true), { ok: true, value: file });
+    assert.equal(await readFile(file, "utf8"), "new");
+    assert.deepEqual(await readdir(dir), ["expenses.csv"]);
   });
 });

@@ -81,3 +81,4 @@ npm start
 | 07 | Debugging: breakpoints, Node inspector, stack traces | [day-07](day-07/) |
 | 08 | TypeScript: types, interfaces, unions, generics, narrowing | [day-08](day-08/) |
 | 09 | npm, scripts, ESLint, Prettier: expense-tracker CLI | [day-09](day-09/) |
+| 10 | Pull requests and code review: expense-tracker improvements | [day-10](day-10/) |

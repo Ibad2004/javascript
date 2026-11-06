@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { config } from "./config.js";
 import { emptyStore, type Expense, type Result, type Store } from "./expenses.js";
@@ -106,14 +106,38 @@ export async function loadStore(filePath: string): Promise<Result<Store>> {
   return store;
 }
 
-export async function saveStore(filePath: string, store: Store): Promise<void> {
+export async function writeTextSafely(filePath: string, text: string): Promise<void> {
   await mkdir(dirname(filePath), { recursive: true });
   const tempFile = `${filePath}.${process.pid}.tmp`;
   try {
-    await writeFile(tempFile, `${JSON.stringify(store, null, 2)}\n`, "utf8");
+    await writeFile(tempFile, text, "utf8");
     await rename(tempFile, filePath);
   } catch (error) {
     await rm(tempFile, { force: true });
     throw error;
   }
+}
+
+export async function saveStore(filePath: string, store: Store): Promise<void> {
+  await writeTextSafely(filePath, `${JSON.stringify(store, null, 2)}\n`);
+}
+
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await stat(filePath);
+    return true;
+  } catch (error) {
+    if (isMissingFile(error)) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+export async function writeExport(filePath: string, text: string, force: boolean): Promise<Result<string>> {
+  if (!force && (await fileExists(filePath))) {
+    return { ok: false, error: `File ${filePath} already exists. Add --force to overwrite it.` };
+  }
+  await writeTextSafely(filePath, text);
+  return { ok: true, value: filePath };
 }

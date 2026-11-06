@@ -22,3 +22,4 @@ build/
 
 # Day 9 expense data
 day-09/data/
+day-09/*.csv

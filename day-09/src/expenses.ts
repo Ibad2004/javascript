@@ -116,6 +116,57 @@ export function addExpense(
   return { ok: true, value: { store: { nextId: id + 1, expenses: [...store.expenses, expense] }, expense } };
 }
 
+export function describeExpense(expense: Expense): string {
+  return `#${expense.id}: ${formatPaisa(toPaisa(expense.amount))} ${expense.description} (${expense.category})`;
+}
+
+export interface ExpenseChanges {
+  amount?: string | undefined;
+  description?: string | undefined;
+  category?: string | undefined;
+}
+
+export function editExpense(
+  store: Store,
+  idInput: string | undefined,
+  changes: ExpenseChanges,
+): Result<{ store: Store; expense: Expense }> {
+  const id = parseId(idInput);
+  if (!id.ok) {
+    return id;
+  }
+  const current = store.expenses.find((expense) => expense.id === id.value);
+  if (current === undefined) {
+    return { ok: false, error: `No expense with id ${id.value}.` };
+  }
+  if (changes.amount === undefined && changes.description === undefined && changes.category === undefined) {
+    return { ok: false, error: "Nothing to edit. Give at least one of --amount, --description, --category." };
+  }
+  let expense: Expense = { ...current };
+  if (changes.amount !== undefined) {
+    const amount = parseAmount(changes.amount);
+    if (!amount.ok) {
+      return amount;
+    }
+    expense = { ...expense, amount: amount.value };
+  }
+  if (changes.description !== undefined) {
+    const description = parseDescription(changes.description);
+    if (!description.ok) {
+      return description;
+    }
+    expense = { ...expense, description: description.value };
+  }
+  if (changes.category !== undefined) {
+    if (changes.category.trim() === "") {
+      return { ok: false, error: "Category cannot be empty." };
+    }
+    expense = { ...expense, category: parseCategory(changes.category) };
+  }
+  const expenses = store.expenses.map((item) => (item.id === expense.id ? expense : item));
+  return { ok: true, value: { store: { nextId: store.nextId, expenses }, expense } };
+}
+
 export function deleteExpense(
   store: Store,
   idInput: string | undefined,
@@ -149,6 +200,25 @@ export function formatList(expenses: Expense[], categoryInput: string | undefine
   return formatTable(shown);
 }
 
+export function parseMonth(input: string | undefined): Result<string> {
+  const text = input?.trim() ?? "";
+  if (text === "") {
+    return { ok: false, error: "Month is required, for example 2026-11." };
+  }
+  if (!config.monthPattern.test(text)) {
+    return { ok: false, error: `Month must be YYYY-MM with month 01-12, got "${text}".` };
+  }
+  return { ok: true, value: text };
+}
+
+export function isoDay(date: string): string {
+  return new Date(date).toISOString().slice(0, 10);
+}
+
+export function filterByMonth(expenses: Expense[], month: string): Expense[] {
+  return expenses.filter((expense) => isoDay(expense.date).startsWith(`${month}-`));
+}
+
 export function computeTotals(expenses: Expense[]): Totals {
   const byCategory = new Map<string, number>();
   let paisa = 0;
@@ -170,7 +240,7 @@ export function formatTable(expenses: Expense[]): string {
   const header = ["ID", "DATE", "CATEGORY", "AMOUNT", "DESCRIPTION"];
   const rows = expenses.map((expense) => [
     String(expense.id),
-    expense.date.slice(0, 10),
+    isoDay(expense.date),
     expense.category,
     formatPaisa(toPaisa(expense.amount)),
     expense.description,
@@ -190,8 +260,8 @@ export function formatTable(expenses: Expense[]): string {
     .join("\n");
 }
 
-export function formatTotals(totals: Totals): string {
+export function formatTotals(totals: Totals, emptyMessage: string = config.emptyMessage): string {
   const lines = totals.byCategory.map((row) => `  ${row.category}: ${formatPaisa(row.paisa)}`);
-  const head = totals.byCategory.length === 0 ? [config.emptyMessage] : [];
+  const head = totals.byCategory.length === 0 ? [emptyMessage] : [];
   return [...head, `Total: ${formatPaisa(totals.paisa)}`, ...lines].join("\n");
 }

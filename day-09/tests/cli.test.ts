@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -64,4 +64,102 @@ test("add then total exits with code 0", () => {
   const total = cli("total");
   assert.equal(total.code, 0);
   assert.equal(total.stdout.trim(), "Total: 450.00\n  food: 450.00");
+});
+
+test("edit changes the given field and prints the edited expense", () => {
+  cli("add", "120.50", "Bus fare", "transport");
+  const result = cli("edit", "1", "--amount", "150");
+  assert.equal(result.code, 0);
+  assert.equal(result.stdout.trim(), "Edited #1: 150.00 Bus fare (transport)");
+});
+
+test("bad edits exit with code 1 and leave the file unchanged", async () => {
+  cli("add", "10", "Tea", "food");
+  const before = await readFile(join(dir, "expenses.json"), "utf8");
+  const cases: [string[], RegExp][] = [
+    [["edit"], /Id is required/],
+    [["edit", "abc", "--amount", "5"], /Id must be a whole number/],
+    [["edit", "99", "--amount", "5"], /No expense with id 99/],
+    [["edit", "1"], /Nothing to edit/],
+    [["edit", "1", "--price", "5"], /Unknown option "--price"/],
+    [["edit", "1", "--amount"], /Option "--amount" needs a value/],
+    [["edit", "1", "--amount", "--category", "x"], /Option "--amount" needs a value/],
+    [["edit", "1", "--amount", "5", "--amount", "6"], /Option "--amount" was given twice/],
+    [["edit", "1", "--amount", "0"], /greater than 0/],
+    [["edit", "1", "--constructor", "x"], /Unknown option "--constructor"/],
+    [["edit", "1", "Green", "tea"], /Unexpected argument "Green"/],
+  ];
+  for (const [args, message] of cases) {
+    const result = cli(...args);
+    assert.equal(result.code, 1, args.join(" "));
+    assert.match(result.stderr, message, args.join(" "));
+  }
+  assert.equal(await readFile(join(dir, "expenses.json"), "utf8"), before);
+});
+
+test("total --month shows that month and an empty month says so", () => {
+  cli("add", "450", "Lunch", "food");
+  const month = new Date().toISOString().slice(0, 7);
+  const current = cli("total", "--month", month);
+  assert.equal(current.code, 0);
+  assert.equal(current.stdout.trim(), "Total: 450.00\n  food: 450.00");
+  const empty = cli("total", "--month", "1999-12");
+  assert.equal(empty.code, 0);
+  assert.equal(empty.stdout.trim(), "No expenses in 1999-12\nTotal: 0.00");
+  assert.equal(cli("total").stdout.trim(), "Total: 450.00\n  food: 450.00");
+});
+
+test("total with a bad or missing month exits with code 1", () => {
+  const cases: [string[], RegExp][] = [
+    [["total", "--month"], /Option "--month" needs a value/],
+    [["total", "--month", "2026-13"], /Month must be YYYY-MM with month 01-12, got "2026-13"/],
+    [["total", "--month", "26-11"], /Month must be YYYY-MM/],
+    [["total", "--month", "2026-11", "--month", "2026-12"], /was given twice/],
+    [["total", "2026-11"], /Unexpected argument "2026-11"/],
+  ];
+  for (const [args, message] of cases) {
+    const result = cli(...args);
+    assert.equal(result.code, 1, args.join(" "));
+    assert.match(result.stderr, message, args.join(" "));
+  }
+});
+
+test("export writes a CSV, refuses to overwrite it, and --force overwrites", async () => {
+  const file = join(dir, "out.csv");
+  cli("add", "450", 'Lunch, "team"', "food");
+  const first = cli("export", file);
+  assert.equal(first.code, 0);
+  assert.equal(first.stdout.trim(), `Exported 1 expense to ${file}`);
+  const day = new Date().toISOString().slice(0, 10);
+  assert.equal(
+    await readFile(file, "utf8"),
+    `id,date,category,amount,description\r\n1,${day},food,450.00,"Lunch, ""team"""\r\n`,
+  );
+  const again = cli("export", file);
+  assert.equal(again.code, 1);
+  assert.match(again.stderr, /already exists\. Add --force/);
+  assert.equal(cli("export", "--force", file).code, 0);
+});
+
+test("export with no expenses writes the header row and says so", async () => {
+  const file = join(dir, "empty.csv");
+  const result = cli("export", file);
+  assert.equal(result.code, 0);
+  assert.equal(result.stdout.trim(), `No expenses yet. Exported the header row only to ${file}`);
+  assert.equal(await readFile(file, "utf8"), "id,date,category,amount,description\r\n");
+});
+
+test("export with a bad file name or option exits with code 1", () => {
+  const cases: [string[], RegExp][] = [
+    [["export"], /File name is required/],
+    [["export", "expenses.json"], /must end with \.csv/],
+    [["export", "a.csv", "b.csv"], /Unexpected argument "b\.csv"/],
+    [["export", "a.csv", "--overwrite"], /Unknown option "--overwrite"/],
+    [["export", "a.csv", "--force", "--force"], /was given twice/],
+  ];
+  for (const [args, message] of cases) {
+    const result = cli(...args);
+    assert.equal(result.code, 1, args.join(" "));
+    assert.match(result.stderr, message, args.join(" "));
+  }
 });

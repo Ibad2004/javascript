@@ -246,9 +246,12 @@ React / Next.js apps.
 
 ## JavaScript vs TypeScript
 
+The Day 6 snippets below are the code as it was when I converted it (commit `4c11102`); the links go to
+that exact version. After Day 8 I fixed the three bugs in Day 6 as well, with a test for each.
+
 ### 1. Collecting the errors (bug 3)
 
-Day 6 ([day-06/summary.js:85](../day-06/summary.js#L85)):
+Day 6 ([day-06/summary.js:85](https://github.com/Ibad2004/javascript/blob/4c11102/day-06/summary.js#L85)):
 
 ```js
     errors: rows.filter((row) => row.error).map((row) => ({ userId: row.user.id, message: row.error })),
@@ -266,7 +269,7 @@ Day 6 kept a row only if `row.error` was **truthy**, so an empty message `""` wa
 
 ### 2. The network error message (bug 1)
 
-Day 6 ([day-06/fetch-with-retry.js:81-84](../day-06/fetch-with-retry.js#L81-L84)):
+Day 6 ([day-06/fetch-with-retry.js:81-84](https://github.com/Ibad2004/javascript/blob/4c11102/day-06/fetch-with-retry.js#L81-L84)):
 
 ```js
 function networkError(error, timeoutMs) {
@@ -292,7 +295,7 @@ uses a `RequestError` class instead, so the retry loop can check `error instance
 
 ### 3. Validating users: unknown in, `ApiUser[]` out
 
-Day 6 ([day-06/summary.js:26-36](../day-06/summary.js#L26-L36)):
+Day 6 ([day-06/summary.js:26-36](https://github.com/Ibad2004/javascript/blob/4c11102/day-06/summary.js#L26-L36)):
 
 ```js
 export function validateUsers(users) {
@@ -331,6 +334,11 @@ objects as `users` (the test "returns the same user objects, extra API fields ke
 
 ## Bugs TypeScript caught
 
+**Update:** all three bugs below are now also fixed in `day-06/`, and each has its own Day 6 test
+(`still gives a readable reason`, `email, city or company that are not strings become null`,
+`a failure with an empty message is still listed in errors`). The Day 6 line numbers here point to the
+version before that fix.
+
 When I started, `npm run typecheck` showed **14 errors**. Then 1 more appeared once I removed a hidden `any`.
 I ran the **unchanged Day 6 code** with bad input to check each one. **6 of the 15 errors point to 3 real
 bugs** (wrong output, no crash). The other 9 were TypeScript not being able to see that the code was already
@@ -342,7 +350,7 @@ safe.
 
 - **tsc:** `src/fetch-with-retry.ts(156,110): error TS2339: Property 'message' does not exist on type '{}'.`
   (and `(156,25)` for `name`)
-- **Day 6:** [day-06/fetch-with-retry.js:82](../day-06/fetch-with-retry.js#L82), `error?.message`
+- **Day 6:** [day-06/fetch-with-retry.js:82](https://github.com/Ibad2004/javascript/blob/4c11102/day-06/fetch-with-retry.js#L82), `error?.message`
 - **Why it is real:** JavaScript can `throw` anything, not only an `Error`. Running Day 6 with
   `fetchFn: async () => { throw "offline"; }` printed
   `GET https://a.test/x failed after 1 attempt. Last reason: network error: undefined`. The real reason
@@ -356,7 +364,7 @@ safe.
 
 - **tsc:** `src/summary.ts(92,5): error TS2322: Type '{} | null' is not assignable to type 'string | null'.`
   plus `TS2339: Property 'city' does not exist on type '{}'.` (93,25) and `Property 'name' ...` (94,28)
-- **Day 6:** [day-06/summary.js:61-63](../day-06/summary.js#L61-L63), `email: user.email ?? null` etc.
+- **Day 6:** [day-06/summary.js:61-63](https://github.com/Ibad2004/javascript/blob/4c11102/day-06/summary.js#L61-L63), `email: user.email ?? null` etc.
 - **Why it is real:** `validateUsers` only checks `id` and `name`. Running Day 6 with
   `email: 42, address: { city: ["x"] }, company: { name: {} }` saved
   `{"id":1,"name":"A","email":42,"city":["x"],"company":{},"postCount":0}`. The output says these are
@@ -371,7 +379,7 @@ safe.
   `any` and tsc said nothing. After I replaced it with `messageOf(result.reason)` (a real `string`), tsc said:
   `src/summary.ts(120,5): error TS2322: Type '{ userId: number; message: string | undefined; }[]' is not
   assignable to type 'readonly SummaryError[]'.`
-- **Day 6:** [day-06/summary.js:85](../day-06/summary.js#L85), `rows.filter((row) => row.error)`
+- **Day 6:** [day-06/summary.js:85](https://github.com/Ibad2004/javascript/blob/4c11102/day-06/summary.js#L85), `rows.filter((row) => row.error)`
 - **Why it is real:** the filter keeps only *truthy* errors, and `""` is falsy. Running Day 6 with a posts
   result `{ status: "rejected", reason: new Error("") }` gave `postCount: null` but `"errors": []`. So the
   summary says nothing failed, and `main.js` would exit with `0` instead of `2`. In `main.js` today the
@@ -383,10 +391,10 @@ safe.
 
 | tsc error | Where | Why it was not a bug |
 | --- | --- | --- |
-| `TS2345: Argument of type 'string \| undefined' is not assignable to parameter of type 'string'` | `parseJson(text)`, [day-06/fetch-with-retry.js:107](../day-06/fetch-with-retry.js#L107) | `text` is always set when we get there (a non-ok response throws first). tsc cannot follow that, so I split out `requestText`, which returns a `string` |
-| `TS18046: 'error' is of type 'unknown'` (×3) and `TS2345` (×1) | the retry loop, [day-06/fetch-with-retry.js:125-134](../day-06/fetch-with-retry.js#L125-L134) | Only `RequestError`s reach that `catch`, and a missing `retryable` was already treated as "not retried". Now `retryableOrThrow` checks `instanceof RequestError` |
-| `TS18046: 'lastError' is of type 'unknown'` | [day-06/fetch-with-retry.js:137](../day-06/fetch-with-retry.js#L137) | `maxAttempts` is at least 1, so `lastError` was always set. The new loop throws from inside, so `lastError` is gone |
-| `TS18046: 'user' is of type 'unknown'` (×3) | `userProblems`, [day-06/summary.js:5-15](../day-06/summary.js#L5-L15) | Day 6 already checked these at runtime; `isPlainObject` just was not a type guard. Now `isObject` + `in` |
+| `TS2345: Argument of type 'string \| undefined' is not assignable to parameter of type 'string'` | `parseJson(text)`, [day-06/fetch-with-retry.js:107](https://github.com/Ibad2004/javascript/blob/4c11102/day-06/fetch-with-retry.js#L107) | `text` is always set when we get there (a non-ok response throws first). tsc cannot follow that, so I split out `requestText`, which returns a `string` |
+| `TS18046: 'error' is of type 'unknown'` (×3) and `TS2345` (×1) | the retry loop, [day-06/fetch-with-retry.js:125-134](https://github.com/Ibad2004/javascript/blob/4c11102/day-06/fetch-with-retry.js#L125-L134) | Only `RequestError`s reach that `catch`, and a missing `retryable` was already treated as "not retried". Now `retryableOrThrow` checks `instanceof RequestError` |
+| `TS18046: 'lastError' is of type 'unknown'` | [day-06/fetch-with-retry.js:137](https://github.com/Ibad2004/javascript/blob/4c11102/day-06/fetch-with-retry.js#L137) | `maxAttempts` is at least 1, so `lastError` was always set. The new loop throws from inside, so `lastError` is gone |
+| `TS18046: 'user' is of type 'unknown'` (×3) | `userProblems`, [day-06/summary.js:5-15](https://github.com/Ibad2004/javascript/blob/4c11102/day-06/summary.js#L5-L15) | Day 6 already checked these at runtime; `isPlainObject` just was not a type guard. Now `isObject` + `in` |
 
 Strict mode also asked for 2 checks in the demo scripts, also not bugs: `'settled' is possibly 'null'`
 (`Promise.allSettled` never rejects) and `Cannot invoke an object which is possibly 'undefined'` for

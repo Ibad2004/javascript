@@ -120,6 +120,17 @@ describe("fetchJsonWithRetry: errors that are not retried", () => {
   });
 });
 
+describe("fetchJsonWithRetry: a thrown value that is not an Error", () => {
+  test("still gives a readable reason", async () => {
+    const { run } = setup([
+      () => {
+        throw "offline";
+      },
+    ]);
+    await assert.rejects(run(), /Last reason: network error: offline$/);
+  });
+});
+
 describe("fetchJsonWithRetry: all attempts fail", () => {
   test("error says the URL, the number of attempts and the last reason, and keeps the cause", async () => {
     const { run, calls, delays } = setup([status(503), networkError(), status(502)]);

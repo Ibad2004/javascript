@@ -133,6 +133,25 @@ describe("buildSummary", () => {
     assert.deepEqual(summary.errors, [{ userId: 1, message: "offline" }]);
   });
 
+  test("a failure with an empty message is still listed in errors", () => {
+    const summary = buildSummary([user(1)], [failed("")], FETCHED_AT);
+    assert.equal(summary.users[0].postCount, null);
+    assert.deepEqual(summary.errors, [{ userId: 1, message: "" }]);
+  });
+
+  test("email, city or company that are not strings become null", () => {
+    const odd = { id: 6, name: "Odd", email: 42, address: { city: ["x"] }, company: { name: {} } };
+    const summary = buildSummary([odd], [posts(0)], FETCHED_AT);
+    assert.deepEqual(summary.users[0], {
+      id: 6,
+      name: "Odd",
+      email: null,
+      city: null,
+      company: null,
+      postCount: 0,
+    });
+  });
+
   test("missing email, address or company become null", () => {
     const summary = buildSummary([{ id: 5, name: "Bare" }], [posts(1)], FETCHED_AT);
     assert.deepEqual(summary.users[0], {

@@ -78,8 +78,11 @@ function httpError(response) {
   });
 }
 
+const messageOf = (error) => (error instanceof Error ? error.message : String(error));
+
 function networkError(error, timeoutMs) {
-  const reason = error?.name === "TimeoutError" ? `timeout after ${timeoutMs} ms` : `network error: ${error?.message}`;
+  const reason =
+    error?.name === "TimeoutError" ? `timeout after ${timeoutMs} ms` : `network error: ${messageOf(error)}`;
   return requestError(reason, { retryable: true, cause: error });
 }
 

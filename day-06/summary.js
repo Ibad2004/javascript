@@ -45,8 +45,11 @@ function checkSummaryArgs(users, postResults, fetchedAt) {
   }
 }
 
+const messageOf = (error) => (error instanceof Error ? error.message : String(error));
+const stringOrNull = (value) => (typeof value === "string" ? value : null);
+
 function postCountOf(result) {
-  if (result?.status === "rejected") return { error: result.reason?.message ?? String(result.reason) };
+  if (result?.status === "rejected") return { error: messageOf(result.reason) };
   if (result?.status !== "fulfilled") return { error: "missing posts result" };
   if (!Array.isArray(result.value)) return { error: "posts response is not an array" };
   return { postCount: result.value.length };
@@ -58,9 +61,9 @@ function toUserRow(user, result) {
     user: {
       id: user.id,
       name: user.name,
-      email: user.email ?? null,
-      city: user.address?.city ?? null,
-      company: user.company?.name ?? null,
+      email: stringOrNull(user.email),
+      city: stringOrNull(user.address?.city),
+      company: stringOrNull(user.company?.name),
       postCount,
     },
     error,
@@ -82,6 +85,6 @@ export function buildSummary(users, postResults, fetchedAt) {
     totalPosts,
     averagePostsPerUser: counts.length === 0 ? 0 : roundTo2(totalPosts / counts.length),
     users: rows.map((row) => row.user),
-    errors: rows.filter((row) => row.error).map((row) => ({ userId: row.user.id, message: row.error })),
+    errors: rows.filter((row) => row.error !== undefined).map((row) => ({ userId: row.user.id, message: row.error })),
   };
 }

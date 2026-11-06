@@ -36,7 +36,7 @@ so the same command works in Bash and in PowerShell.
 | [summary.test.js](summary.test.js) | 17 tests for validation, totals, average and partial failures |
 | [output/users-summary.json](output/users-summary.json) | One real result of `node day-06/main.js` |
 
-60 tests in total. They use a fake `fetch` and a fake `sleep`, so they never
+63 tests in total. They use a fake `fetch` and a fake `sleep`, so they never
 touch the network and never really wait for a retry delay.
 
 ### Exit codes of main.js
@@ -649,10 +649,15 @@ is turned into a clear message:
 
 ```js
 function networkError(error, timeoutMs) {
-  const reason = error?.name === "TimeoutError" ? `timeout after ${timeoutMs} ms` : `network error: ${error?.message}`;
+  const reason =
+    error?.name === "TimeoutError" ? `timeout after ${timeoutMs} ms` : `network error: ${messageOf(error)}`;
   return requestError(reason, { retryable: true, cause: error });
 }
 ```
+
+`messageOf(error)` uses `error.message` only when the thrown value really is an `Error`. If something
+else is thrown (for example the string `"offline"`), it uses `String(error)`, so the reason reads
+`network error: offline` instead of `network error: undefined`.
 
 A new signal is created for every attempt. One shared signal would already be
 aborted after the first timeout, and every retry would fail instantly.
@@ -772,15 +777,32 @@ function loadPostsInParallel(users) {
 
 ```js
 function postCountOf(result) {
-  if (result?.status === "rejected") return { error: result.reason?.message ?? String(result.reason) };
+  if (result?.status === "rejected") return { error: messageOf(result.reason) };
   if (result?.status !== "fulfilled") return { error: "missing posts result" };
   if (!Array.isArray(result.value)) return { error: "posts response is not an array" };
   return { postCount: result.value.length };
 }
 ```
 
-`String(result.reason)` covers a promise rejected with something that is not
-an `Error` (for example the string `"offline"`), which has no `.message`.
+`messageOf` covers a promise rejected with something that is not an `Error`
+(for example the string `"offline"`), which has no `.message`.
+
+A user only gets an entry in `errors` when `postCountOf` returned an `error`. The check is
+`row.error !== undefined`, not just `row.error`, so a failure whose message is an empty string `""`
+is still listed:
+
+```js
+    errors: rows.filter((row) => row.error !== undefined).map((row) => ({ userId: row.user.id, message: row.error })),
+```
+
+`email`, `city` and `company` are copied only when they really are text. Anything else from the API
+(a number, a list, an object) becomes `null`, so wrong data never reaches the saved file:
+
+```js
+      email: stringOrNull(user.email),
+      city: stringOrNull(user.address?.city),
+      company: stringOrNull(user.company?.name),
+```
 
 The totals only use real numbers, and the average cannot become `NaN`:
 
@@ -937,6 +959,9 @@ waits for them.
 | Every user's posts failed | Average `0`, all in `errors` | `every user failed: average 0, all in errors` |
 | A user with 0 posts | Counts as `0`, not as an error | `a user with 0 posts counts as 0, not as an error` |
 | Posts response is not an array | Treated as an error for that user | `a posts response that is not an array becomes an error` |
+| A posts failure with an empty message | Still listed in `errors` (message `""`) | `a failure with an empty message is still listed in errors` |
+| `email`, `city` or `company` that are not text | `null` in the output | `email, city or company that are not strings become null` |
+| Something that is not an `Error` is thrown (e.g. `"offline"`) | Reason reads `network error: offline` | `still gives a readable reason` |
 
 ---
 
@@ -954,6 +979,18 @@ waits for them.
    waiting. The README says Node 22 or newer, so that had to work. **Fix:** the test helper
    `hangUntilAborted` holds a `keepAlive` timer until the signal fires (see section 10). Now all
    60 tests pass on Node 22 and Node 24.
+4. **Three bugs that I only found on Day 8.** When I converted this script to TypeScript (Day 8),
+   strict mode pointed at three places that were unsafe, and running this Day 6 code confirmed
+   each one was a real bug:
+   - Throwing something that is not an `Error` (like `"offline"`) gave the reason
+     `network error: undefined`. **Fix:** `messageOf(error)`.
+   - Wrong types from the API (an email that is a number, a city that is a list) were saved into
+     the JSON as they were. **Fix:** `stringOrNull`, so anything that is not text becomes `null`.
+   - A posts failure with an empty message was left out of `errors`, because `""` counts as false.
+     **Fix:** check `row.error !== undefined`.
+
+   Each one now has its own test, so the suite has 63 tests. The full story of how TypeScript
+   found them is in [day-08/README.md](../day-08/README.md#bugs-typescript-caught).
 
 ## Mutation check
 
@@ -986,7 +1023,7 @@ real files were never edited:
 - `Promise.allSettled` is the right tool when partial results are still
   useful: one failed user should not throw away the other nine.
 - Passing in `fetchFn` and `sleep` makes slow, network-dependent code fully
-  testable: 60 tests run offline in about a quarter of a second.
+  testable: 63 tests run offline in about a quarter of a second.
 - Writing to a temp file and renaming it means a crash can never leave a
   half-written JSON file.
 - `??` and `||` are different: `0 ?? 500` is `0`, but `0 || 500` is `500`.

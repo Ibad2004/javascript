@@ -8,4 +8,6 @@ export const config = Object.freeze({
   maxAmount: 1_000_000_000,
   emptyMessage: "No expenses yet",
   monthPattern: /^\d{4}-(0[1-9]|1[0-2])$/,
+  csvFormulaStarts: ["=", "+", "-", "@", "\t", "\r"],
+  csvLineEnding: "\r\n",
 });

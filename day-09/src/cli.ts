@@ -11,7 +11,8 @@ import {
   parseMonth,
   type Result,
 } from "./expenses.js";
-import { loadStore, saveStore } from "./storage.js";
+import { parseCsvPath, toCsv } from "./export.js";
+import { loadStore, saveStore, writeExport } from "./storage.js";
 
 const helpText = `Usage: npm start -- <command>
 
@@ -23,6 +24,7 @@ Commands:
   total [--month YYYY-MM]                 Show the overall total and the total per category,
                                           optionally for one month (UTC)
   delete <id>                             Delete an expense by id
+  export <file.csv> [--force]             Save all expenses as CSV (--force overwrites the file)
   help, --help, -h                        Show this help
 
 Example: npm start -- add 450 "Lunch with team" food`;
@@ -74,7 +76,7 @@ async function run(args: string[]): Promise<number> {
     console.log(helpText);
     return 0;
   }
-  if (!["add", "edit", "list", "total", "delete"].includes(command)) {
+  if (!["add", "edit", "list", "total", "delete", "export"].includes(command)) {
     console.error(`Unknown command "${command}".\n`);
     console.error(helpText);
     return 1;
@@ -156,6 +158,36 @@ async function run(args: string[]): Promise<number> {
     }
     const inMonth = filterByMonth(store.expenses, month.value);
     console.log(formatTotals(computeTotals(inMonth), `No expenses in ${month.value}`));
+    return 0;
+  }
+
+  if (command === "export") {
+    const parsed = parseArgs(rest, { force: "switch" });
+    if (!parsed.ok) {
+      console.error(parsed.error);
+      return 1;
+    }
+    const { positional, switches } = parsed.value;
+    if (positional.length > 1) {
+      console.error(`Unexpected argument "${positional[1] ?? ""}". Use: export expenses.csv [--force]`);
+      return 1;
+    }
+    const file = parseCsvPath(positional[0]);
+    if (!file.ok) {
+      console.error(file.error);
+      return 1;
+    }
+    const written = await writeExport(file.value, toCsv(store.expenses), switches.has("force"));
+    if (!written.ok) {
+      console.error(written.error);
+      return 1;
+    }
+    const count = store.expenses.length;
+    if (count === 0) {
+      console.log(`${config.emptyMessage}. Exported the header row only to ${file.value}`);
+    } else {
+      console.log(`Exported ${count} expense${count === 1 ? "" : "s"} to ${file.value}`);
+    }
     return 0;
   }
 

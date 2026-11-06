@@ -12,7 +12,11 @@ const networkError = () => () => {
 };
 const hangUntilAborted = () => (init) =>
   new Promise((resolve, reject) => {
-    init.signal.addEventListener("abort", () => reject(init.signal.reason));
+    const keepAlive = setTimeout(() => {}, 60_000);
+    init.signal.addEventListener("abort", () => {
+      clearTimeout(keepAlive);
+      reject(init.signal.reason);
+    });
   });
 
 function setup(steps, options = {}) {

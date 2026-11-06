@@ -663,9 +663,20 @@ rejects when the signal fires, and the test uses `timeoutMs: 20`:
 ```js
 const hangUntilAborted = () => (init) =>
   new Promise((resolve, reject) => {
-    init.signal.addEventListener("abort", () => reject(init.signal.reason));
+    const keepAlive = setTimeout(() => {}, 60_000);
+    init.signal.addEventListener("abort", () => {
+      clearTimeout(keepAlive);
+      reject(init.signal.reason);
+    });
   });
 ```
+
+**Why the `keepAlive` timer:** the timer inside `AbortSignal.timeout` does not keep Node
+running on its own (it is "unref'd"). On Node 22, while the fake fetch waits for that
+signal, Node sees nothing else to wait for, decides the test file is finished and cancels
+the remaining tests. The empty `keepAlive` timer keeps Node running until the signal fires,
+and it is cleared straight away so it never slows the tests down. Real requests in
+`main.js` do not need this, because an open network connection keeps Node running.
 
 ## 11. Temp file + rename
 
@@ -937,6 +948,12 @@ waits for them.
 2. I expected fetch to throw on a 404, but it only throws on network errors.
    A 404 comes back as a normal response with ok = false, so I had to check
    response.ok myself.
+3. **33 tests were "cancelled" on Node 22.** All 60 tests passed on my PC (Node 24), but on
+   Node 22 the timeout test stopped the whole file: `AbortSignal.timeout` uses a timer that does
+   not keep Node running, so Node thought the file was finished while the fake fetch was still
+   waiting. The README says Node 22 or newer, so that had to work. **Fix:** the test helper
+   `hangUntilAborted` holds a `keepAlive` timer until the signal fires (see section 10). Now all
+   60 tests pass on Node 22 and Node 24.
 
 ## Mutation check
 

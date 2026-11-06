@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -64,4 +64,35 @@ test("add then total exits with code 0", () => {
   const total = cli("total");
   assert.equal(total.code, 0);
   assert.equal(total.stdout.trim(), "Total: 450.00\n  food: 450.00");
+});
+
+test("edit changes the given field and prints the edited expense", () => {
+  cli("add", "120.50", "Bus fare", "transport");
+  const result = cli("edit", "1", "--amount", "150");
+  assert.equal(result.code, 0);
+  assert.equal(result.stdout.trim(), "Edited #1: 150.00 Bus fare (transport)");
+});
+
+test("bad edits exit with code 1 and leave the file unchanged", async () => {
+  cli("add", "10", "Tea", "food");
+  const before = await readFile(join(dir, "expenses.json"), "utf8");
+  const cases: [string[], RegExp][] = [
+    [["edit"], /Id is required/],
+    [["edit", "abc", "--amount", "5"], /Id must be a whole number/],
+    [["edit", "99", "--amount", "5"], /No expense with id 99/],
+    [["edit", "1"], /Nothing to edit/],
+    [["edit", "1", "--price", "5"], /Unknown option "--price"/],
+    [["edit", "1", "--amount"], /Option "--amount" needs a value/],
+    [["edit", "1", "--amount", "--category", "x"], /Option "--amount" needs a value/],
+    [["edit", "1", "--amount", "5", "--amount", "6"], /Option "--amount" was given twice/],
+    [["edit", "1", "--amount", "0"], /greater than 0/],
+    [["edit", "1", "--constructor", "x"], /Unknown option "--constructor"/],
+    [["edit", "1", "Green", "tea"], /Unexpected argument "Green"/],
+  ];
+  for (const [args, message] of cases) {
+    const result = cli(...args);
+    assert.equal(result.code, 1, args.join(" "));
+    assert.match(result.stderr, message, args.join(" "));
+  }
+  assert.equal(await readFile(join(dir, "expenses.json"), "utf8"), before);
 });

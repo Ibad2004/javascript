@@ -116,6 +116,57 @@ export function addExpense(
   return { ok: true, value: { store: { nextId: id + 1, expenses: [...store.expenses, expense] }, expense } };
 }
 
+export function describeExpense(expense: Expense): string {
+  return `#${expense.id}: ${formatPaisa(toPaisa(expense.amount))} ${expense.description} (${expense.category})`;
+}
+
+export interface ExpenseChanges {
+  amount?: string | undefined;
+  description?: string | undefined;
+  category?: string | undefined;
+}
+
+export function editExpense(
+  store: Store,
+  idInput: string | undefined,
+  changes: ExpenseChanges,
+): Result<{ store: Store; expense: Expense }> {
+  const id = parseId(idInput);
+  if (!id.ok) {
+    return id;
+  }
+  const current = store.expenses.find((expense) => expense.id === id.value);
+  if (current === undefined) {
+    return { ok: false, error: `No expense with id ${id.value}.` };
+  }
+  if (changes.amount === undefined && changes.description === undefined && changes.category === undefined) {
+    return { ok: false, error: "Nothing to edit. Give at least one of --amount, --description, --category." };
+  }
+  let expense: Expense = { ...current };
+  if (changes.amount !== undefined) {
+    const amount = parseAmount(changes.amount);
+    if (!amount.ok) {
+      return amount;
+    }
+    expense = { ...expense, amount: amount.value };
+  }
+  if (changes.description !== undefined) {
+    const description = parseDescription(changes.description);
+    if (!description.ok) {
+      return description;
+    }
+    expense = { ...expense, description: description.value };
+  }
+  if (changes.category !== undefined) {
+    if (changes.category.trim() === "") {
+      return { ok: false, error: "Category cannot be empty." };
+    }
+    expense = { ...expense, category: parseCategory(changes.category) };
+  }
+  const expenses = store.expenses.map((item) => (item.id === expense.id ? expense : item));
+  return { ok: true, value: { store: { nextId: store.nextId, expenses }, expense } };
+}
+
 export function deleteExpense(
   store: Store,
   idInput: string | undefined,

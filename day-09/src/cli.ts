@@ -5,8 +5,10 @@ import {
   deleteExpense,
   describeExpense,
   editExpense,
+  filterByMonth,
   formatList,
   formatTotals,
+  parseMonth,
   type Result,
 } from "./expenses.js";
 import { loadStore, saveStore } from "./storage.js";
@@ -18,7 +20,8 @@ Commands:
   edit <id> [--amount X] [--description "text"] [--category name]
                                           Change only the given fields of an expense
   list [category]                         Show expenses, optionally for one category
-  total                                   Show the overall total and the total per category
+  total [--month YYYY-MM]                 Show the overall total and the total per category,
+                                          optionally for one month (UTC)
   delete <id>                             Delete an expense by id
   help, --help, -h                        Show this help
 
@@ -132,7 +135,27 @@ async function run(args: string[]): Promise<number> {
   }
 
   if (command === "total") {
-    console.log(formatTotals(computeTotals(store.expenses)));
+    const parsed = parseArgs(rest, { month: "value" });
+    if (!parsed.ok) {
+      console.error(parsed.error);
+      return 1;
+    }
+    if (parsed.value.positional.length > 0) {
+      console.error(`Unexpected argument "${parsed.value.positional[0] ?? ""}". Use: total --month 2026-11`);
+      return 1;
+    }
+    const monthInput = parsed.value.values.get("month");
+    if (monthInput === undefined) {
+      console.log(formatTotals(computeTotals(store.expenses)));
+      return 0;
+    }
+    const month = parseMonth(monthInput);
+    if (!month.ok) {
+      console.error(month.error);
+      return 1;
+    }
+    const inMonth = filterByMonth(store.expenses, month.value);
+    console.log(formatTotals(computeTotals(inMonth), `No expenses in ${month.value}`));
     return 0;
   }
 

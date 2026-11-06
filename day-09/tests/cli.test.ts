@@ -96,3 +96,30 @@ test("bad edits exit with code 1 and leave the file unchanged", async () => {
   }
   assert.equal(await readFile(join(dir, "expenses.json"), "utf8"), before);
 });
+
+test("total --month shows that month and an empty month says so", () => {
+  cli("add", "450", "Lunch", "food");
+  const month = new Date().toISOString().slice(0, 7);
+  const current = cli("total", "--month", month);
+  assert.equal(current.code, 0);
+  assert.equal(current.stdout.trim(), "Total: 450.00\n  food: 450.00");
+  const empty = cli("total", "--month", "1999-12");
+  assert.equal(empty.code, 0);
+  assert.equal(empty.stdout.trim(), "No expenses in 1999-12\nTotal: 0.00");
+  assert.equal(cli("total").stdout.trim(), "Total: 450.00\n  food: 450.00");
+});
+
+test("total with a bad or missing month exits with code 1", () => {
+  const cases: [string[], RegExp][] = [
+    [["total", "--month"], /Option "--month" needs a value/],
+    [["total", "--month", "2026-13"], /Month must be YYYY-MM with month 01-12, got "2026-13"/],
+    [["total", "--month", "26-11"], /Month must be YYYY-MM/],
+    [["total", "--month", "2026-11", "--month", "2026-12"], /was given twice/],
+    [["total", "2026-11"], /Unexpected argument "2026-11"/],
+  ];
+  for (const [args, message] of cases) {
+    const result = cli(...args);
+    assert.equal(result.code, 1, args.join(" "));
+    assert.match(result.stderr, message, args.join(" "));
+  }
+});

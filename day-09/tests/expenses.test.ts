@@ -5,6 +5,7 @@ import {
   computeTotals,
   deleteExpense,
   editExpense,
+  filterByMonth,
   emptyStore,
   filterByCategory,
   formatList,
@@ -12,6 +13,7 @@ import {
   formatTotals,
   parseAmount,
   parseCategory,
+  parseMonth,
   type Store,
 } from "../src/expenses.js";
 
@@ -217,5 +219,52 @@ describe("editExpense", () => {
       ok: false,
       error: "Category cannot be empty.",
     });
+  });
+});
+
+describe("monthly total", () => {
+  function storeOverMonths(): Store {
+    let store = emptyStore();
+    const rows: [string, string, string, string][] = [
+      ["10", "Tea", "food", "2026-10-31T23:59:59.000Z"],
+      ["20", "Lunch", "food", "2026-11-01T00:00:00.000Z"],
+      ["5.5", "Bus", "transport", "2026-11-30T12:00:00.000Z"],
+    ];
+    for (const [amount, description, category, date] of rows) {
+      const result = addExpense(store, amount, description, category, new Date(date));
+      assert.ok(result.ok);
+      store = result.value.store;
+    }
+    return store;
+  }
+
+  test("accepts a YYYY-MM month", () => {
+    assert.deepEqual(parseMonth("2026-11"), { ok: true, value: "2026-11" });
+    assert.deepEqual(parseMonth(" 2026-01 "), { ok: true, value: "2026-01" });
+  });
+
+  test("rejects 2026-13, 2026-1, 26-11, abc and 2026-00", () => {
+    for (const month of ["2026-13", "2026-1", "26-11", "abc", "2026-00", "2026-11-05"]) {
+      assert.equal(parseMonth(month).ok, false, month);
+    }
+  });
+
+  test("rejects a missing month", () => {
+    assert.deepEqual(parseMonth(undefined), { ok: false, error: "Month is required, for example 2026-11." });
+  });
+
+  test("totals only the expenses of that month", () => {
+    const totals = computeTotals(filterByMonth(storeOverMonths().expenses, "2026-11"));
+    assert.equal(
+      formatTotals(totals, "No expenses in 2026-11"),
+      "Total: 25.50\n  food: 20.00\n  transport: 5.50",
+    );
+  });
+
+  test("a month with no expenses says so and totals 0.00, never NaN", () => {
+    const totals = computeTotals(filterByMonth(storeOverMonths().expenses, "2026-12"));
+    const text = formatTotals(totals, "No expenses in 2026-12");
+    assert.equal(text, "No expenses in 2026-12\nTotal: 0.00");
+    assert.ok(!text.includes("NaN"));
   });
 });

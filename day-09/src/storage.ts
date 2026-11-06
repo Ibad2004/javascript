@@ -12,7 +12,7 @@ function isPositiveInteger(value: unknown): value is number {
 }
 
 function isValidAmount(value: unknown): value is number {
-  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0 || value > config.maxAmount) {
     return false;
   }
   const scaled = value * 10 ** config.maxDecimals;
@@ -33,7 +33,10 @@ function parseExpense(value: unknown, index: number): Result<Expense> {
     return { ok: false, error: `${where}.id must be a whole number above 0.` };
   }
   if (!isValidAmount(amount)) {
-    return { ok: false, error: `${where}.amount must be a positive number with at most 2 decimals.` };
+    return {
+      ok: false,
+      error: `${where}.amount must be a positive number up to ${config.maxAmount} with at most 2 decimals.`,
+    };
   }
   if (!isFilledString(description)) {
     return { ok: false, error: `${where}.description must be a non-empty string.` };

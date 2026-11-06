@@ -5,5 +5,6 @@ export const config = Object.freeze({
     process.env["EXPENSES_FILE"] ?? fileURLToPath(new URL("../../data/expenses.json", import.meta.url)),
   defaultCategory: "other",
   maxDecimals: 2,
+  maxAmount: 1_000_000_000,
   emptyMessage: "No expenses yet",
 });

@@ -12,13 +12,13 @@ runs from one `npm run check`.
 
 All commands run from `day-09/`. `npm start` builds first (the `prestart` script), then runs the CLI.
 
-| Command                                  | Example                                         |
-| ---------------------------------------- | ----------------------------------------------- |
-| `add <amount> <description> [category]`  | `npm start -- add 450 "Lunch with team" food`   |
-| `list [category]`                        | `npm start -- list` or `npm start -- list food` |
-| `total`                                  | `npm start -- total`                            |
-| `delete <id>`                            | `npm start -- delete 2`                         |
-| `help` (also: no command, unknown → `1`) | `npm start -- help`                             |
+| Command                                                 | Example                                         |
+| ------------------------------------------------------- | ----------------------------------------------- |
+| `add <amount> <description> [category]`                 | `npm start -- add 450 "Lunch with team" food`   |
+| `list [category]`                                       | `npm start -- list` or `npm start -- list food` |
+| `total`                                                 | `npm start -- total`                            |
+| `delete <id>`                                           | `npm start -- delete 2`                         |
+| `help` (also `--help`, `-h`, no command; unknown → `1`) | `npm start -- --help`                           |
 
 - Category defaults to `other` and is trimmed and lowercased (`" Food "` → `food`).
 - Amount must be a positive number with at most 2 decimals. Totals are added in whole paisa.
@@ -62,7 +62,7 @@ disagrees with Prettier. `no-console` is an error everywhere except `src/cli.ts`
 ```text
 day-09/
 ├── src/
-│   ├── config.ts          one frozen config object: data file path, default category, max decimals
+│   ├── config.ts          one frozen config object: data file, default category, max decimals, max amount
 │   ├── expenses.ts        pure logic: parse and validate input, add, delete, filter, totals, formatting
 │   ├── storage.ts         file I/O: load (missing → empty, bad JSON/shape → error), safe save, shape check
 │   └── cli.ts             parses arguments, calls the functions above, prints, sets the exit code
@@ -102,28 +102,33 @@ export function toPaisa(amount: number): number {
 
 ## Edge cases → tests
 
-| Edge case                       | Test                                                                                                |
-| ------------------------------- | --------------------------------------------------------------------------------------------------- |
-| amount `0`                      | `rejects amount 0`                                                                                  |
-| negative amount                 | `rejects a negative amount`                                                                         |
-| `"abc"`                         | `rejects a non-number amount like abc`                                                              |
-| `"12.345"`                      | `rejects more than 2 decimals like 12.345`                                                          |
-| `Infinity`                      | `rejects Infinity`                                                                                  |
-| missing amount                  | `rejects a missing amount`                                                                          |
-| empty or blank description      | `rejects an empty or blank description`                                                             |
-| category trimmed and lowercased | `trims and lowercases the category and defaults to other`                                           |
-| ids never reused                | `never reuses an id after the highest one is deleted`                                               |
-| delete id that doesn't exist    | `rejects an id that does not exist`                                                                 |
-| delete `"abc"`                  | `rejects a non-number id like abc`                                                                  |
-| delete with missing id          | `rejects a missing id`                                                                              |
-| list with no expenses           | `list with no expenses says No expenses yet`                                                        |
-| total with no expenses          | `total with no expenses is 0.00 and never NaN`                                                      |
-| `0.1 + 0.2`                     | `totals use whole paisa so 0.1 + 0.2 is exactly 0.30`                                               |
-| missing data file               | `a missing data file starts empty`                                                                  |
-| corrupted JSON                  | `corrupted JSON gives a clear error and does not overwrite the file`                                |
-| wrong shape                     | `wrong shape in the file gives a clear error`, `rejects a bare array, duplicate ids and a bad date` |
-| unknown command                 | `unknown command shows help and exits with code 1`                                                  |
-| bad amount from the CLI         | `bad amount exits with code 1 and saves nothing`                                                    |
+| Edge case                                 | Test                                                                                                  |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| amount `0`                                | `rejects amount 0`                                                                                    |
+| negative amount                           | `rejects a negative amount`                                                                           |
+| `"abc"`                                   | `rejects a non-number amount like abc`                                                                |
+| `"12.345"`                                | `rejects more than 2 decimals like 12.345`                                                            |
+| `Infinity`                                | `rejects Infinity`                                                                                    |
+| missing amount                            | `rejects a missing amount`                                                                            |
+| empty or blank description                | `rejects an empty or blank description`                                                               |
+| category trimmed and lowercased           | `trims and lowercases the category and defaults to other`                                             |
+| ids never reused                          | `never reuses an id after the highest one is deleted`                                                 |
+| delete id that doesn't exist              | `rejects an id that does not exist`                                                                   |
+| delete `"abc"`                            | `rejects a non-number id like abc`                                                                    |
+| delete with missing id                    | `rejects a missing id`                                                                                |
+| list with no expenses                     | `list with no expenses says No expenses yet`                                                          |
+| list a category with no expenses          | `list for a category with no expenses names that category` (prints `No expenses in category "nope".`) |
+| amount above 1,000,000,000                | `rejects an amount above the maximum instead of saving a rounded value`                               |
+| exactly the maximum amount                | `accepts the largest allowed amount exactly`                                                          |
+| amount above the maximum in the data file | `an amount above the maximum in the file gives a clear error`                                         |
+| `--help` and `-h`                         | `help, --help and -h show help and exit with code 0`                                                  |
+| total with no expenses                    | `total with no expenses is 0.00 and never NaN`                                                        |
+| `0.1 + 0.2`                               | `totals use whole paisa so 0.1 + 0.2 is exactly 0.30`                                                 |
+| missing data file                         | `a missing data file starts empty`                                                                    |
+| corrupted JSON                            | `corrupted JSON gives a clear error and does not overwrite the file`                                  |
+| wrong shape                               | `wrong shape in the file gives a clear error`, `rejects a bare array, duplicate ids and a bad date`   |
+| unknown command                           | `unknown command shows help and exits with code 1`                                                    |
+| bad amount from the CLI                   | `bad amount exits with code 1 and saves nothing`                                                      |
 
 ## What broke and how I fixed it
 
@@ -137,6 +142,16 @@ export function toPaisa(amount: number): number {
    running the `npm` batch file before `&&` left those carets in the text. I proved it with a probe script:
    `node -e` alone got `"a b"`, `npm run build && node -e` got `"^a^ b^"`. Fix: moved the build into a
    `prestart` script, so `start` is only `node dist/src/cli.js`. `npm start` still builds first.
+4. **Huge amounts were saved with the wrong value.** Trying unusual input, `add 99999999999999.99 Yacht` was
+   saved as `99999999999999.98`, and `add 9007199254740993 x` as `9007199254740992.00`. JavaScript numbers are
+   exact only up to 2^53, and amounts are also multiplied by 100 for paisa, so very large amounts lose digits.
+   **Fix:** `maxAmount: 1_000_000_000` in `src/config.ts`. Anything bigger is rejected with
+   `Amount can be at most 1000000000.00, got ...`, both when adding and when loading the data file.
+5. **`list nope` said "No expenses yet" when there were expenses.** The empty table message did not know a
+   category had been asked for. **Fix:** `formatList` says `No expenses in category "nope".` when other
+   expenses exist.
+6. **`--help` was an "Unknown command".** People usually try `--help` or `-h` first, so both now show help
+   with exit code `0`.
 
 ## What I learned
 
@@ -156,4 +171,4 @@ export function toPaisa(amount: number): number {
 3. **`src/cli.ts`** only turns arguments into function calls and results into text and an exit code.
 4. **`src/config.ts`** holds every setting in one object.
 5. **`tests/`** mirrors that split: logic, storage, and one file that runs the real CLI.
-6. **Tooling**: `npm run check` runs typecheck, lint, format check and 29 tests in one go.
+6. **Tooling**: `npm run check` runs typecheck, lint, format check and 37 tests in one go.

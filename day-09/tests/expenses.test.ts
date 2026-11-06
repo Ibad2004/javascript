@@ -6,6 +6,7 @@ import {
   deleteExpense,
   emptyStore,
   filterByCategory,
+  formatList,
   formatTable,
   formatTotals,
   parseAmount,
@@ -53,6 +54,20 @@ describe("parseAmount", () => {
 
   test("rejects a missing amount", () => {
     assert.deepEqual(parseAmount(undefined), { ok: false, error: "Amount is required." });
+  });
+
+  test("accepts the largest allowed amount exactly", () => {
+    assert.deepEqual(parseAmount("1000000000"), { ok: true, value: 1_000_000_000 });
+    assert.deepEqual(parseAmount("999999999.99"), { ok: true, value: 999_999_999.99 });
+  });
+
+  test("rejects an amount above the maximum instead of saving a rounded value", () => {
+    for (const text of ["1000000000.01", "99999999999999.99", "9007199254740993"]) {
+      assert.deepEqual(parseAmount(text), {
+        ok: false,
+        error: `Amount can be at most 1000000000.00, got ${text}.`,
+      });
+    }
   });
 });
 
@@ -128,6 +143,21 @@ describe("list and total", () => {
     const totals = computeTotals(storeWith(["0.1", "A", "x"], ["0.2", "B", "x"]).expenses);
     assert.equal(totals.paisa, 30);
     assert.equal(formatTotals(totals), "Total: 0.30\n  x: 0.30");
+  });
+
+  test("list for a category with no expenses names that category", () => {
+    const store = storeWith(["10", "A", "food"]);
+    assert.equal(formatList(store.expenses, "Nope"), 'No expenses in category "nope".');
+  });
+
+  test("list with no expenses at all still says No expenses yet, even with a category", () => {
+    assert.equal(formatList([], "food"), "No expenses yet");
+    assert.equal(formatList([], undefined), "No expenses yet");
+  });
+
+  test("list without a category shows every expense", () => {
+    const store = storeWith(["10", "A", "food"], ["20", "B", "transport"]);
+    assert.equal(formatList(store.expenses, "  "), formatTable(store.expenses));
   });
 
   test("filters by category case-insensitively", () => {

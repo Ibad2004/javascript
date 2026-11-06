@@ -3,9 +3,8 @@ import {
   addExpense,
   computeTotals,
   deleteExpense,
-  filterByCategory,
+  formatList,
   formatPaisa,
-  formatTable,
   formatTotals,
   toPaisa,
 } from "./expenses.js";
@@ -18,14 +17,14 @@ Commands:
   list [category]                         Show expenses, optionally for one category
   total                                   Show the overall total and the total per category
   delete <id>                             Delete an expense by id
-  help                                    Show this help
+  help, --help, -h                        Show this help
 
 Example: npm start -- add 450 "Lunch with team" food`;
 
 async function run(args: string[]): Promise<number> {
   const [command, ...rest] = args;
 
-  if (command === undefined || command === "help") {
+  if (command === undefined || ["help", "--help", "-h"].includes(command)) {
     console.log(helpText);
     return 0;
   }
@@ -63,7 +62,7 @@ async function run(args: string[]): Promise<number> {
   }
 
   if (command === "list") {
-    console.log(formatTable(filterByCategory(store.expenses, rest[0])));
+    console.log(formatList(store.expenses, rest[0]));
     return 0;
   }
 

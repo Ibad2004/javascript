@@ -32,6 +32,21 @@ test("unknown command shows help and exits with code 1", () => {
   assert.match(result.stderr, /Usage: npm start -- <command>/);
 });
 
+test("help, --help and -h show help and exit with code 0", () => {
+  for (const flag of ["help", "--help", "-h"]) {
+    const result = cli(flag);
+    assert.equal(result.code, 0, flag);
+    assert.match(result.stdout, /Usage: npm start -- <command>/, flag);
+  }
+});
+
+test("an amount above the maximum exits with code 1 and saves nothing", () => {
+  const result = cli("add", "99999999999999.99", "Yacht");
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /Amount can be at most 1000000000\.00/);
+  assert.equal(cli("list").stdout.trim(), "No expenses yet");
+});
+
 test("no command shows help and exits with code 0", () => {
   const result = cli();
   assert.equal(result.code, 0);

@@ -40,6 +40,14 @@ describe("loadStore", () => {
     assert.ok(!result.ok && result.error.includes("expenses[0].amount"));
   });
 
+  test("an amount above the maximum in the file gives a clear error", async () => {
+    const file = join(dir, "expenses.json");
+    const expense = { id: 1, amount: 2_000_000_000, description: "A", category: "x", date: "2026-11-05" };
+    await writeFile(file, JSON.stringify({ nextId: 2, expenses: [expense] }));
+    const result = await loadStore(file);
+    assert.ok(!result.ok && result.error.includes("expenses[0].amount"));
+  });
+
   test("loads the committed example file", async () => {
     const result = await loadStore(fileURLToPath(new URL("../../expenses.example.json", import.meta.url)));
     assert.ok(result.ok);

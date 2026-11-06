@@ -56,6 +56,12 @@ export function parseAmount(input: string | undefined): Result<number> {
   if (decimals > config.maxDecimals) {
     return { ok: false, error: `Amount can have at most ${config.maxDecimals} decimals, got ${text}.` };
   }
+  if (amount > config.maxAmount) {
+    return {
+      ok: false,
+      error: `Amount can be at most ${formatPaisa(toPaisa(config.maxAmount))}, got ${text}.`,
+    };
+  }
   return { ok: true, value: amount };
 }
 
@@ -132,6 +138,15 @@ export function filterByCategory(expenses: Expense[], categoryInput: string | un
   }
   const category = parseCategory(categoryInput);
   return expenses.filter((expense) => expense.category === category);
+}
+
+export function formatList(expenses: Expense[], categoryInput: string | undefined): string {
+  const shown = filterByCategory(expenses, categoryInput);
+  const hasCategory = categoryInput !== undefined && categoryInput.trim() !== "";
+  if (shown.length === 0 && expenses.length > 0 && hasCategory) {
+    return `No expenses in category "${parseCategory(categoryInput)}".`;
+  }
+  return formatTable(shown);
 }
 
 export function computeTotals(expenses: Expense[]): Totals {

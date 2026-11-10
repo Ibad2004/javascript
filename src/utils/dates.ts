@@ -93,3 +93,15 @@ export function toLocalDateString(date: Date): string {
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
+
+/**
+ * addDays('2026-11-30', 1) → '2026-12-01'. Negative numbers go back in time.
+ * Built from local date parts: the Date constructor rolls over months and years
+ * for us, and we read the result back with local getters (no toISOString, no UTC).
+ * Midday is used so a daylight-saving change at midnight can never shift the day.
+ */
+export function addDays(date: string, days: number): string {
+  const parts = parseDateOnly(date);
+  if (parts === null) throw new Error(`addDays expects a "YYYY-MM-DD" date, got "${date}".`);
+  return toLocalDateString(new Date(parts.year, parts.month - 1, parts.day + days, 12));
+}

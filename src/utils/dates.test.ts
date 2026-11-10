@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FAKE_TODAY } from '../test/makeTask';
 import {
+  addDays,
   formatDueDate,
   getDueLabel,
   getDueStatus,
@@ -48,6 +49,26 @@ describe('toLocalDateString', () => {
   it('uses the local calendar date, even late at night', () => {
     expect(toLocalDateString(new Date(2026, 10, 12, 23, 59))).toBe('2026-11-12');
     expect(toLocalDateString(new Date(2026, 0, 5, 0, 1))).toBe('2026-01-05');
+  });
+});
+
+describe('addDays', () => {
+  it('rolls over month ends, year ends and leap days', () => {
+    expect(addDays('2026-11-10', 1)).toBe('2026-11-11');
+    expect(addDays('2026-11-30', 1)).toBe('2026-12-01');
+    expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
+    expect(addDays('2028-02-28', 1)).toBe('2028-02-29');
+    expect(addDays('2026-02-28', 1)).toBe('2026-03-01');
+  });
+
+  it('goes back in time with negative numbers', () => {
+    expect(addDays('2026-01-01', -1)).toBe('2025-12-31');
+    expect(addDays('2026-03-01', -2)).toBe('2026-02-27');
+    expect(addDays('2026-11-10', 0)).toBe('2026-11-10');
+  });
+
+  it('throws on a string that is not "YYYY-MM-DD"', () => {
+    expect(() => addDays('10/11/2026', 1)).toThrow('addDays expects');
   });
 });
 

@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { parseDateOnly } from '../utils/dates';
-import { sampleTasks } from './sampleTasks';
+import { FAKE_TODAY } from '../test/makeTask';
+import { getDueStatus, parseDateOnly } from '../utils/dates';
+import { createSampleTasks } from './sampleTasks';
 
-describe('sampleTasks', () => {
+const sampleTasks = createSampleTasks(FAKE_TODAY);
+
+describe('createSampleTasks', () => {
   it('has 6 to 8 tasks', () => {
     expect(sampleTasks.length).toBeGreaterThanOrEqual(6);
     expect(sampleTasks.length).toBeLessThanOrEqual(8);
@@ -40,4 +43,33 @@ describe('sampleTasks', () => {
     // Urdu uses the Arabic script block.
     expect(sampleTasks.some((task) => /[؀-ۿ]/.test(task.title))).toBe(true);
   });
+
+  it('places the not-done due dates 2 days ago, today, tomorrow and in a week (fake today)', () => {
+    const notDoneDates = sampleTasks.filter((task) => !task.done).map((task) => task.dueDate);
+    expect(notDoneDates).toEqual(
+      expect.arrayContaining(['2026-11-08', '2026-11-10', '2026-11-11', '2026-11-17', null]),
+    );
+  });
+
+  // Month ends, year ends, leap days and daylight-saving change days.
+  const todays = [
+    FAKE_TODAY,
+    '2026-01-01',
+    '2026-03-01',
+    '2026-03-29',
+    '2026-10-25',
+    '2026-11-01',
+    '2026-12-31',
+    '2028-02-29',
+    '2028-03-01',
+  ];
+
+  it.each(todays)(
+    'built for today = %s, has exactly one "Due today" and one "Overdue" not-done task',
+    (today) => {
+      const statuses = createSampleTasks(today).map((task) => getDueStatus(task, today));
+      expect(statuses.filter((status) => status === 'today')).toHaveLength(1);
+      expect(statuses.filter((status) => status === 'overdue')).toHaveLength(1);
+    },
+  );
 });

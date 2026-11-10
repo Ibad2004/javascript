@@ -50,7 +50,7 @@ src/
   App.tsx              the top component (state lives here)
   main.tsx             reads today's date once and renders <App today={...} />
   types.ts             Priority and Task types
-  data/sampleTasks.ts  8 static demo tasks
+  data/sampleTasks.ts  createSampleTasks(today): 8 demo tasks, due dates relative to today
   components/          one component per file, each with typed props
   utils/               pure logic: sorting, filtering, dates, plurals, scrolling
   test/                test setup and a makeTask() helper
@@ -65,7 +65,7 @@ src/
 | `selectedId`           | state (`useState`)    | App                             | TaskList highlights it and TaskDetail shows it: siblings can only share data through their parent.                                     |
 | `visibleTasks`         | derived (not state)   | computed in App on every render | Filtered and sorted from `tasks` + `hideDone`. A second copy in state could get out of sync.                                           |
 | `selectedTask`         | derived (not state)   | computed in App                 | Looked up by id in the visible list, so a hidden task can never show as a stale detail.                                                |
-| `today`                | prop                  | main.tsx → App → children       | Read once outside React (rendering stays pure). Tests pass a fake date.                                                                |
+| `today`                | prop                  | main.tsx → App → children       | Read once outside React (rendering stays pure). Also used to build the sample due dates. Tests pass a fake date.                       |
 | `tasks` (summary/list) | prop                  | App → TaskSummary, TaskList     | Children only read data; they never own it.                                                                                            |
 | `task`, `isSelected`   | prop                  | TaskList → TaskItem             | Each item only needs its own task and whether it is selected.                                                                          |
 | `onSelect`, `onShow`   | prop (callback)       | App → TaskList/TaskItem, Note   | Children cannot change App's state directly, so they call a function App gives them.                                                   |
@@ -121,30 +121,32 @@ State updates use the updater form, for example `setHideDone((h) => !h)`.
 
 **Known limits** (honest list):
 
-- "Today" is read once when the page loads. If the tab stays open past midnight, reload it.
-- The sample dates are fixed (written on 10 Nov 2026), so on other days different tasks will show as
-  overdue or due today.
+- The date is read **once, on page load**. If the page stays open past midnight, "Due today" and
+  "Overdue" still use yesterday's date: refresh the page to update them.
 - The toggle changes both its label and `aria-pressed`, as the brief asked. Some screen reader guides
   prefer a fixed label with only `aria-pressed` changing. I will look at this again on Day 15.
 
 ## Tests
 
-**60 tests in 10 files**, run with Vitest + React Testing Library + jsdom.
+**73 tests in 10 files**, run with Vitest + React Testing Library + jsdom.
 
-| File                                  | Tests | What it checks                                                                                                                        |
-| ------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/App.test.tsx`                    | 10    | empty list, sort order, toggle + aria-pressed, hidden note + Show them, all hidden, select / deselect, stale detail cleared, keyboard |
-| `src/components/TaskItem.test.tsx`    | 6     | text status/priority, overdue, done never overdue, due today, aria-pressed + dir, keyboard                                            |
-| `src/components/TaskDetail.test.tsx`  | 4     | null message, "No description" (empty and spaces only), full detail with line breaks                                                  |
-| `src/components/TaskForm.test.tsx`    | 4     | labels, disabled button + note, submit prevented, Enter does not crash                                                                |
-| `src/components/TaskSummary.test.tsx` | 4     | 0 tasks, 1 of 1, some done, all done                                                                                                  |
-| `src/utils/dates.test.ts`             | 14    | formatting, null, invalid dates, leap years, local today, overdue / today with a fake today                                           |
-| `src/utils/tasks.test.ts`             | 8     | sort order, no mutation, filter, summary text, list status text and plurals                                                           |
-| `src/data/sampleTasks.test.ts`        | 5     | 6 to 8 tasks, unique ids, non-empty titles, valid dates, edge cases present                                                           |
-| `src/utils/scroll.test.ts`            | 3     | smooth scroll, reduced motion, no scroll on wide screens                                                                              |
-| `src/utils/plural.test.ts`            | 2     | 0 / 1 / 2 and a custom plural                                                                                                         |
+| File                                  | Tests | What it checks                                                                                                                                            |
+| ------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/App.test.tsx`                    | 10    | empty list, sort order, toggle + aria-pressed, hidden note + Show them, all hidden, select / deselect, stale detail cleared, keyboard                     |
+| `src/components/TaskItem.test.tsx`    | 6     | text status/priority, overdue, done never overdue, due today, aria-pressed + dir, keyboard                                                                |
+| `src/components/TaskDetail.test.tsx`  | 4     | null message, "No description" (empty and spaces only), full detail with line breaks                                                                      |
+| `src/components/TaskForm.test.tsx`    | 4     | labels, disabled button + note, submit prevented, Enter does not crash                                                                                    |
+| `src/components/TaskSummary.test.tsx` | 4     | 0 tasks, 1 of 1, some done, all done                                                                                                                      |
+| `src/utils/dates.test.ts`             | 17    | formatting, null, invalid dates, leap years, local today, addDays, overdue / today with a fake today                                                      |
+| `src/utils/tasks.test.ts`             | 8     | sort order, no mutation, filter, summary text, list status text and plurals                                                                               |
+| `src/data/sampleTasks.test.ts`        | 15    | 6 to 8 tasks, unique ids, non-empty titles, valid dates, edge cases present, relative dates, exactly one due today + one overdue for 9 different "todays" |
+| `src/utils/scroll.test.ts`            | 3     | smooth scroll, reduced motion, no scroll on wide screens                                                                                                  |
+| `src/utils/plural.test.ts`            | 2     | 0 / 1 / 2 and a custom plural                                                                                                                             |
 
 Every date test uses a fake today (`2026-11-10`), so the tests never depend on the real date.
+The sample-data test also builds the tasks for 9 different "todays" (month ends, year ends, leap days
+and daylight-saving change days) and checks each one has exactly one "Due today" and one "Overdue"
+not-done task.
 
 ## What broke
 
@@ -166,10 +168,16 @@ Real problems and surprises from building Day 11:
    492px, so the "320px" screenshot really showed a 492px page, cut off. I only noticed because the
    right edge was missing. To test properly I made a probe page that zooms the layout down to 246 CSS
    px and counts the elements that go past the screen edge: 0.
-6. **All 60 tests passed on the first run**, which made me suspicious. To check they can really fail,
+6. **All 60 tests in the first version of the suite passed on the first run**, which made me suspicious. To check they can really fail,
    I broke the code on purpose (looked up the selected task in `tasks` instead of `visibleTasks`). The
    "clears the detail when the filter hides the selected task" test failed as it should, then I put
    the code back.
+7. **The demo was only right on one day.** The first sample data had fixed due dates written for
+   10 Nov 2026, so on any other day the wrong tasks showed as "Overdue" or "Due today", or none did.
+   Now `createSampleTasks(today)` builds the dates from the user's local today with `addDays()`
+   (local date parts, no `toISOString`, no UTC). A test builds the data for 9 different "todays" and
+   checks there is always exactly one "Due today" and one "Overdue" not-done task. To prove the test
+   works, I moved the overdue task onto today on purpose: 10 tests failed, then I put it back.
 
 ## Tech
 

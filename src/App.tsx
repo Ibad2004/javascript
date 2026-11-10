@@ -5,7 +5,7 @@ import { TaskDetail } from './components/TaskDetail';
 import { TaskForm } from './components/TaskForm';
 import { TaskList } from './components/TaskList';
 import { TaskSummary } from './components/TaskSummary';
-import { sampleTasks } from './data/sampleTasks';
+import { createSampleTasks } from './data/sampleTasks';
 import type { Task } from './types';
 import { scrollIntoViewOnNarrowScreen } from './utils/scroll';
 import { countDone, getListStatusText, getVisibleTasks } from './utils/tasks';
@@ -17,9 +17,10 @@ type AppProps = {
   today: string;
 };
 
-export function App({ initialTasks = sampleTasks, today }: AppProps) {
+export function App({ initialTasks, today }: AppProps) {
   // The setter is not used until tasks can be added (next update).
-  const [tasks] = useState<Task[]>(initialTasks);
+  // The function form builds the sample tasks only once, on the first render.
+  const [tasks] = useState<Task[]>(() => initialTasks ?? createSampleTasks(today));
   const [hideDone, setHideDone] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const detailRef = useRef<HTMLDivElement>(null);

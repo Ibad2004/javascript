@@ -11,6 +11,7 @@ javascript/
 ├── day-01/              # One folder per day of practice
 │   ├── index.js         # The day's code
 │   └── README.md        # Goals, how to run it, what I learned
+├── task-tracker/        # Week 3 (Days 11 to 15): Vite + React + TypeScript app
 ├── notes/               # Reference notes (Git, JS concepts, React, ...)
 │   └── git-cheatsheet.md
 ├── templates/
@@ -81,3 +82,12 @@ npm start
 | 07 | Debugging: breakpoints, Node inspector, stack traces | [day-07](day-07/) |
 | 08 | TypeScript: types, interfaces, unions, generics, narrowing | [day-08](day-08/) |
 | 09 | npm, scripts, ESLint, Prettier: expense-tracker CLI | [day-09](day-09/) |
+| 10 | Pull request and code review: expense-tracker improvements | [day-10](day-10/) |
+| 11 | React with Vite + TypeScript: components, JSX, props and state (static data) | [task-tracker](task-tracker/) |
+| 12 | Task tracker: adding tasks with a working form | [task-tracker](task-tracker/) |
+| 13 | Task tracker: mark done, edit and delete tasks | [task-tracker](task-tracker/) |
+| 14 | Task tracker: saving and loading tasks between visits | [task-tracker](task-tracker/) |
+| 15 | Task tracker: styling | [task-tracker](task-tracker/) |
+
+Days 11 to 15 build one app, the [task tracker](task-tracker/) (Week 3). Its own README lists what
+each day adds. Days 12 to 15 are planned.

@@ -16,9 +16,11 @@ Days 12 to 14 are my plan and may change. Day 15 is fixed as the styling day.
 ## How to run
 
 You need Node.js. On Windows PowerShell use `npm.cmd` (the `npm.ps1` script is blocked by the
-execution policy).
+execution policy). The app lives in the `task-tracker/` folder of the `javascript` repo, so run
+every command from inside that folder.
 
 ```powershell
+cd task-tracker      # from the root of the javascript repo
 npm.cmd install      # install dependencies
 npm.cmd run dev      # start the dev server, then open the printed URL
 npm.cmd test         # run the tests once

@@ -1,12 +1,14 @@
 import type { Task } from '../types';
-import { formatDueDate } from '../utils/dates';
+import { getDueLabel, getDueStatus } from '../utils/dates';
 import { PRIORITY_LABELS } from '../utils/tasks';
 
 type TaskDetailProps = {
   task: Task | null;
+  /** The user's local date, "YYYY-MM-DD". */
+  today: string;
 };
 
-export function TaskDetail({ task }: TaskDetailProps) {
+export function TaskDetail({ task, today }: TaskDetailProps) {
   return (
     <section className="panel task-detail" aria-labelledby="detail-heading">
       <h2 id="detail-heading">Task details</h2>
@@ -23,7 +25,7 @@ export function TaskDetail({ task }: TaskDetailProps) {
             <dt>Priority</dt>
             <dd>{PRIORITY_LABELS[task.priority]}</dd>
             <dt>Due date</dt>
-            <dd>{formatDueDate(task.dueDate)}</dd>
+            <dd className={`due due-${getDueStatus(task, today)}`}>{getDueLabel(task, today)}</dd>
             <dt>Description</dt>
             {task.description.trim() === '' ? (
               <dd className="empty">No description</dd>

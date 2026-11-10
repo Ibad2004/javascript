@@ -1,4 +1,5 @@
 import type { Priority, Task } from '../types';
+import { pluralize } from './plural';
 
 /**
  * Not-done tasks first, then by due date (earliest first, no date last),
@@ -38,6 +39,20 @@ export function countDone(tasks: readonly Task[]): number {
 export function getSummaryText(tasks: readonly Task[]): string {
   if (tasks.length === 0) return 'No tasks yet';
   return `${countDone(tasks)} of ${tasks.length} done`;
+}
+
+/**
+ * The line above the list. It is a live region, so screen readers
+ * hear the change when the filter hides or shows tasks.
+ */
+export function getListStatusText(totalCount: number, visibleCount: number): string {
+  if (totalCount === 0) return 'No tasks yet. Add your first task below.';
+  if (visibleCount === 0) {
+    return totalCount === 1
+      ? 'Your only task is done, so it is hidden.'
+      : `All ${totalCount} tasks are done, so they are all hidden.`;
+  }
+  return `Showing ${pluralize(visibleCount, 'task')}`;
 }
 
 export const PRIORITY_LABELS: Record<Priority, string> = {

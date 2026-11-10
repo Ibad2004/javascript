@@ -50,6 +50,42 @@ export function formatDueDate(dueDate: string | null): string {
   return `${parts.day} ${monthName} ${parts.year}`;
 }
 
+export type DueStatus = 'none' | 'overdue' | 'today' | 'scheduled';
+
+/**
+ * Compares the due date with `today` ("YYYY-MM-DD", the user's local date).
+ * `today` is passed in so tests can use a fake date.
+ * Done tasks are never overdue or "due today".
+ */
+export function getDueStatus(
+  task: { done: boolean; dueDate: string | null },
+  today: string,
+): DueStatus {
+  if (task.dueDate === null || parseDateOnly(task.dueDate) === null) return 'none';
+  if (task.done) return 'scheduled';
+  if (task.dueDate < today) return 'overdue';
+  if (task.dueDate === today) return 'today';
+  return 'scheduled';
+}
+
+/** The text shown next to a task, e.g. "Overdue (was due 5 Nov 2026)". */
+export function getDueLabel(
+  task: { done: boolean; dueDate: string | null },
+  today: string,
+): string {
+  const date = formatDueDate(task.dueDate);
+  switch (getDueStatus(task, today)) {
+    case 'none':
+      return date;
+    case 'overdue':
+      return `Overdue (was due ${date})`;
+    case 'today':
+      return 'Due today';
+    case 'scheduled':
+      return `Due ${date}`;
+  }
+}
+
 /** The user's LOCAL calendar date as "YYYY-MM-DD" (not the UTC date). */
 export function toLocalDateString(date: Date): string {
   const year = String(date.getFullYear()).padStart(4, '0');

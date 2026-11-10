@@ -1,0 +1,20 @@
+# Dependencies and build output
+node_modules
+dist
+dist-ssr
+coverage
+
+# Environment files (may hold secrets)
+.env*
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor and OS files
+*.local
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db

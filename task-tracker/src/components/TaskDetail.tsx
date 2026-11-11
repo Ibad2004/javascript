@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { Task } from '../types';
 import { getDueLabel, getDueStatus } from '../utils/dates';
 import { PRIORITY_LABELS } from '../utils/tasks';
@@ -6,13 +7,17 @@ type TaskDetailProps = {
   task: Task | null;
   /** The user's local date, "YYYY-MM-DD". */
   today: string;
+  /** The edit form. When given, it is shown instead of the task's details. */
+  children?: ReactNode;
 };
 
-export function TaskDetail({ task, today }: TaskDetailProps) {
+export function TaskDetail({ task, today, children }: TaskDetailProps) {
   return (
     <section className="panel task-detail" aria-labelledby="detail-heading">
       <h2 id="detail-heading">Task details</h2>
-      {task === null ? (
+      {children !== undefined ? (
+        children
+      ) : task === null ? (
         <p className="empty">Select a task to see its details</p>
       ) : (
         <>

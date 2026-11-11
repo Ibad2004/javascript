@@ -7,12 +7,20 @@ import { TaskItem } from './TaskItem';
 
 function renderItem(task: Task, isSelected = false) {
   const onSelect = vi.fn();
+  const onEdit = vi.fn();
   render(
     <ul>
-      <TaskItem task={task} isSelected={isSelected} onSelect={onSelect} today={FAKE_TODAY} />
+      <TaskItem
+        task={task}
+        isSelected={isSelected}
+        isEditing={false}
+        onSelect={onSelect}
+        onEdit={onEdit}
+        today={FAKE_TODAY}
+      />
     </ul>,
   );
-  return { onSelect };
+  return { onSelect, onEdit };
 }
 
 describe('TaskItem', () => {
@@ -40,7 +48,7 @@ describe('TaskItem', () => {
 
   it('is a real button with aria-pressed and dir="auto" on the title', () => {
     renderItem(makeTask({ id: '1', title: 'ہفتہ وار رپورٹ' }), true);
-    const button = screen.getByRole('button', { name: /ہفتہ وار رپورٹ/ });
+    const button = screen.getByRole('button', { name: /^ہفتہ وار رپورٹ/ });
     expect(button).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByText('ہفتہ وار رپورٹ')).toHaveAttribute('dir', 'auto');
   });
@@ -49,10 +57,29 @@ describe('TaskItem', () => {
     const user = userEvent.setup();
     const { onSelect } = renderItem(makeTask({ id: 'abc' }));
     await user.tab();
-    expect(screen.getByRole('button')).toHaveFocus();
+    expect(screen.getByRole('button', { name: /^Task abc/ })).toHaveFocus();
     await user.keyboard('{Enter}');
     await user.keyboard(' ');
     expect(onSelect).toHaveBeenCalledTimes(2);
     expect(onSelect).toHaveBeenCalledWith('abc');
+  });
+
+  it('has an Edit button NEXT TO the select button, not inside it', async () => {
+    const user = userEvent.setup();
+    const { onEdit, onSelect } = renderItem(makeTask({ id: 'abc', title: 'Buy milk' }));
+    const edit = screen.getByRole('button', { name: 'Edit Buy milk' });
+    const select = screen.getByRole('button', { name: /^Buy milk/ });
+    expect(select).not.toContainElement(edit);
+    expect(edit.closest('button')).toBe(edit);
+    await user.click(edit);
+    expect(onEdit).toHaveBeenCalledWith('abc');
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('keeps a long title and Urdu text in the row with dir="auto"', () => {
+    const long = 'Refactor_'.repeat(11);
+    renderItem(makeTask({ id: '1', title: long }));
+    expect(screen.getByText(long)).toHaveAttribute('dir', 'auto');
+    expect(screen.getByRole('button', { name: `Edit ${long}` })).toBeInTheDocument();
   });
 });

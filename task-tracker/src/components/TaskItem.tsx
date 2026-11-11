@@ -1,24 +1,33 @@
 import type { Task } from '../types';
 import { getDueLabel, getDueStatus } from '../utils/dates';
+import { focusIds } from '../utils/focusIds';
 import { PRIORITY_LABELS } from '../utils/tasks';
 
 type TaskItemProps = {
   task: Task;
   isSelected: boolean;
+  isEditing: boolean;
   onSelect: (id: string) => void;
+  onEdit: (id: string) => void;
   /** The user's local date, "YYYY-MM-DD". */
   today: string;
 };
 
-export function TaskItem({ task, isSelected, onSelect, today }: TaskItemProps) {
+/**
+ * One row: [select button with title and info] [Edit].
+ * The buttons sit SIDE BY SIDE, never inside each other:
+ * a button inside a <button> is invalid HTML.
+ */
+export function TaskItem({ task, isSelected, isEditing, onSelect, onEdit, today }: TaskItemProps) {
   const dueStatus = getDueStatus(task, today);
 
   return (
-    <li>
+    <li className={`task-item${task.done ? ' is-done' : ''}`}>
       {/* A real <button>: Tab reaches it, Enter and Space select it. */}
       <button
         type="button"
-        className={`task-button priority-${task.priority}${task.done ? ' is-done' : ''}`}
+        id={focusIds.select(task.id)}
+        className={`task-button priority-${task.priority}`}
         aria-pressed={isSelected}
         onClick={() => onSelect(task.id)}
       >
@@ -30,8 +39,20 @@ export function TaskItem({ task, isSelected, onSelect, today }: TaskItemProps) {
           <span>{task.done ? 'Done' : 'Not done'}</span>
           <span>Priority: {PRIORITY_LABELS[task.priority]}</span>
           <span className={`due due-${dueStatus}`}>{getDueLabel(task, today)}</span>
+          {isEditing && <span className="editing-tag">Editing</span>}
         </span>
       </button>
+      <div className="task-actions">
+        {/* The title is in the accessible name, so "Edit" buttons are told apart in a list of links/buttons. */}
+        <button
+          type="button"
+          id={focusIds.edit(task.id)}
+          aria-label={`Edit ${task.title}`}
+          onClick={() => onEdit(task.id)}
+        >
+          Edit
+        </button>
+      </div>
     </li>
   );
 }

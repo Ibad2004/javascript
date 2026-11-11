@@ -35,7 +35,7 @@ describe('App', () => {
 
   it('lists the tasks sorted: not-done first, then by due date', () => {
     renderApp();
-    const items = within(screen.getByRole('list')).getAllByRole('button');
+    const items = within(screen.getByRole('list')).getAllByRole('listitem');
     expect(items.map((item) => item.textContent)).toEqual([
       expect.stringContaining('Write report'),
       expect.stringContaining('Call the bank'),
@@ -90,7 +90,7 @@ describe('App', () => {
 
   it('shows a task in the detail panel and deselects it on a second click', async () => {
     const { user } = renderApp();
-    const task = screen.getByRole('button', { name: /Write report/ });
+    const task = screen.getByRole('button', { name: /^Write report/ });
 
     await user.click(task);
     expect(task).toHaveAttribute('aria-pressed', 'true');
@@ -105,9 +105,9 @@ describe('App', () => {
 
   it('selecting another task moves the selection', async () => {
     const { user } = renderApp();
-    await user.click(screen.getByRole('button', { name: /Write report/ }));
-    await user.click(screen.getByRole('button', { name: /Clean desk/ }));
-    expect(screen.getByRole('button', { name: /Write report/ })).toHaveAttribute(
+    await user.click(screen.getByRole('button', { name: /^Write report/ }));
+    await user.click(screen.getByRole('button', { name: /^Clean desk/ }));
+    expect(screen.getByRole('button', { name: /^Write report/ })).toHaveAttribute(
       'aria-pressed',
       'false',
     );
@@ -116,7 +116,7 @@ describe('App', () => {
 
   it('clears the detail (no stale task) when the filter hides the selected task', async () => {
     const { user } = renderApp();
-    await user.click(screen.getByRole('button', { name: /Call the bank/ }));
+    await user.click(screen.getByRole('button', { name: /^Call the bank/ }));
     expect(
       within(detailPanel()).getByRole('heading', { name: 'Call the bank' }),
     ).toBeInTheDocument();
@@ -130,7 +130,7 @@ describe('App', () => {
     const { user } = renderApp();
     await user.tab(); // the toggle button
     await user.tab(); // the first task
-    expect(screen.getByRole('button', { name: /Write report/ })).toHaveFocus();
+    expect(screen.getByRole('button', { name: /^Write report/ })).toHaveFocus();
     await user.keyboard('{Enter}');
     expect(
       within(detailPanel()).getByRole('heading', { name: 'Write report' }),

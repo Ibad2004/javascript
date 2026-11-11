@@ -181,6 +181,22 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.task-check {
+  display: flex;
+  align-items: center;
+  /* A bigger click and touch target than the bare checkbox. */
+  min-height: 2.75rem;
+  padding-inline: 0.25rem;
+  cursor: pointer;
+}
+
+.task-check input {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  cursor: pointer;
+}
+
 .task-actions {
   display: flex;
   gap: 0.25rem;

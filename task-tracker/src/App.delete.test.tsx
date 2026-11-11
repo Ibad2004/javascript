@@ -129,8 +129,9 @@ describe('App: deleting tasks', () => {
     const { user } = setup();
     await user.click(screen.getByRole('button', { name: 'Delete Task B' }));
     // Focus moved to Task C. The Undo bar sits just above the list, so from the
-    // first task (A) one Shift+Tab reaches the Undo button.
+    // first task (A) Shift+Tab twice (past A's checkbox) reaches the Undo button.
     await user.click(screen.getByRole('button', { name: /^Task A/ }));
+    await user.tab({ shift: true });
     await user.tab({ shift: true });
     expect(undoButton()).toHaveFocus();
     wait(20_000);

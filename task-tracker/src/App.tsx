@@ -21,6 +21,7 @@ import {
   makeId as defaultMakeId,
   restoreTask,
   toFormValues,
+  toggleDone,
   updateTask,
 } from './utils/tasks';
 
@@ -198,6 +199,24 @@ export function App({ initialTasks, today, makeId = defaultMakeId }: AppProps) {
     requestFocus(focusIds.select(task.id));
   }
 
+  function handleToggleDone(id: string) {
+    const task = tasks.find((t) => t.id === id);
+    if (task === undefined) return;
+    const nowDone = !task.done;
+    const willHide = nowDone && hideDone;
+    // Read before the update: once hidden, the task is no longer in visibleTasks.
+    const neighbour = willHide ? neighbourOf(id) : null;
+
+    setTasks((old) => toggleDone(old, id));
+    if (willHide) {
+      announce('Task marked done (hidden)');
+      // The checkbox that had focus disappears with its row.
+      requestFocus(neighbour !== null ? focusIds.select(neighbour.id) : focusIds.listHeading);
+    } else {
+      announce(nowDone ? 'Task marked done' : 'Task marked not done');
+    }
+  }
+
   function toggleHideDone() {
     setHideDone((h) => !h);
   }
@@ -240,6 +259,7 @@ export function App({ initialTasks, today, makeId = defaultMakeId }: AppProps) {
               onSelect={(id) => guardedAction({ kind: 'select', id })}
               onEdit={(id) => guardedAction({ kind: 'edit', id })}
               onDelete={handleDelete}
+              onToggleDone={handleToggleDone}
               today={today}
             />
           )}

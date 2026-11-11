@@ -9,6 +9,7 @@ function renderItem(task: Task, isSelected = false) {
   const onSelect = vi.fn();
   const onEdit = vi.fn();
   const onDelete = vi.fn();
+  const onToggleDone = vi.fn();
   render(
     <ul>
       <TaskItem
@@ -18,11 +19,12 @@ function renderItem(task: Task, isSelected = false) {
         onSelect={onSelect}
         onEdit={onEdit}
         onDelete={onDelete}
+        onToggleDone={onToggleDone}
         today={FAKE_TODAY}
       />
     </ul>,
   );
-  return { onSelect, onEdit, onDelete };
+  return { onSelect, onEdit, onDelete, onToggleDone };
 }
 
 describe('TaskItem', () => {
@@ -58,6 +60,7 @@ describe('TaskItem', () => {
   it('can be selected with the keyboard (Tab, then Enter or Space)', async () => {
     const user = userEvent.setup();
     const { onSelect } = renderItem(makeTask({ id: 'abc' }));
+    await user.tab(); // the checkbox
     await user.tab();
     expect(screen.getByRole('button', { name: /^Task abc/ })).toHaveFocus();
     await user.keyboard('{Enter}');
@@ -93,5 +96,36 @@ describe('TaskItem', () => {
     await user.click(del);
     expect(onDelete).toHaveBeenCalledWith('abc');
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('has a checkbox labelled "Mark <title> as done" that toggles with Space', async () => {
+    const user = userEvent.setup();
+    const { onToggleDone, onSelect } = renderItem(makeTask({ id: 'abc', title: 'Buy milk' }));
+    const checkbox = screen.getByRole('checkbox', { name: 'Mark Buy milk as done' });
+    expect(checkbox).not.toBeChecked();
+    expect(screen.getByRole('button', { name: /^Buy milk/ })).not.toContainElement(checkbox);
+    await user.tab();
+    expect(checkbox).toHaveFocus();
+    await user.keyboard(' ');
+    expect(onToggleDone).toHaveBeenCalledWith('abc');
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('shows a done task as checked', () => {
+    renderItem(makeTask({ id: '1', title: 'Old', done: true }));
+    expect(screen.getByRole('checkbox', { name: 'Mark Old as done' })).toBeChecked();
+  });
+
+  it('lays out the row as checkbox, select, Edit, Delete (no control inside another)', () => {
+    renderItem(makeTask({ id: '1', title: 'Row' }));
+    const item = screen.getByRole('listitem');
+    const controls = [...item.querySelectorAll('input, button')];
+    expect(controls.map((el) => el.getAttribute('aria-label') ?? el.getAttribute('type'))).toEqual([
+      'checkbox',
+      'button',
+      'Edit Row',
+      'Delete Row',
+    ]);
+    expect(item.querySelector('button button, button input')).toBeNull();
   });
 });

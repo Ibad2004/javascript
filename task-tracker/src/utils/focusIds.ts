@@ -5,6 +5,7 @@
 export const focusIds = {
   select: (taskId: string) => `task-${taskId}-select`,
   edit: (taskId: string) => `task-${taskId}-edit`,
+  done: (taskId: string) => `task-${taskId}-done`,
   remove: (taskId: string) => `task-${taskId}-delete`,
   listHeading: 'tasks-heading',
   unsavedBar: 'unsaved-bar',

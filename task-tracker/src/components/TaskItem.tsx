@@ -9,6 +9,7 @@ type TaskItemProps = {
   isEditing: boolean;
   onSelect: (id: string) => void;
   onEdit: (id: string) => void;
+  onToggleDone: (id: string) => void;
   /** No confirm dialog: App shows an Undo bar instead. */
   onDelete: (id: string) => void;
   /** The user's local date, "YYYY-MM-DD". */
@@ -16,7 +17,7 @@ type TaskItemProps = {
 };
 
 /**
- * One row: [select button with title and info] [Edit] [Delete].
+ * One row: [checkbox] [select button with title and info] [Edit] [Delete].
  * The buttons sit SIDE BY SIDE, never inside each other:
  * a button inside a <button> is invalid HTML.
  */
@@ -26,6 +27,7 @@ export function TaskItem({
   isEditing,
   onSelect,
   onEdit,
+  onToggleDone,
   onDelete,
   today,
 }: TaskItemProps) {
@@ -33,6 +35,16 @@ export function TaskItem({
 
   return (
     <li className={`task-item${task.done ? ' is-done' : ''}`}>
+      {/* The label text is hidden on screen (the title is right next to it) but read by screen readers. */}
+      <label className="task-check">
+        <input
+          type="checkbox"
+          id={focusIds.done(task.id)}
+          checked={task.done}
+          onChange={() => onToggleDone(task.id)}
+        />
+        <span className="visually-hidden">Mark {task.title} as done</span>
+      </label>
       {/* A real <button>: Tab reaches it, Enter and Space select it. */}
       <button
         type="button"

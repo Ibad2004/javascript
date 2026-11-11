@@ -129,6 +129,7 @@ describe('App', () => {
   it('lets a keyboard user reach a task with Tab and select it with Enter', async () => {
     const { user } = renderApp();
     await user.tab(); // the toggle button
+    await user.tab(); // the first task's "done" checkbox
     await user.tab(); // the first task
     expect(screen.getByRole('button', { name: /^Write report/ })).toHaveFocus();
     await user.keyboard('{Enter}');

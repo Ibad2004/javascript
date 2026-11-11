@@ -8,7 +8,9 @@
 
 body {
   margin: 0;
-  font-family: system-ui, sans-serif;
+  /* The Arabic-script fonts come before the generic sans-serif: on Linux the fallback
+     (DejaVu Sans) has no bold "ہ", so Urdu titles showed empty boxes. Missing fonts are skipped. */
+  font-family: system-ui, 'Noto Sans Arabic', 'Noto Naskh Arabic', sans-serif;
   line-height: 1.5;
   color: #1f2937;
   background: #f9fafb;

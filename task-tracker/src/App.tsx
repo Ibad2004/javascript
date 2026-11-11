@@ -6,6 +6,7 @@ import { TaskDetail } from './components/TaskDetail';
 import { TaskForm } from './components/TaskForm';
 import { TaskList } from './components/TaskList';
 import { TaskSummary } from './components/TaskSummary';
+import { UndoBar } from './components/UndoBar';
 import { UnsavedChangesBar } from './components/UnsavedChangesBar';
 import { createSampleTasks } from './data/sampleTasks';
 import type { Task, TaskInput } from './types';
@@ -14,9 +15,11 @@ import { scrollIntoViewOnNarrowScreen } from './utils/scroll';
 import {
   addTask,
   countDone,
+  deleteTask,
   getListStatusText,
   getVisibleTasks,
   makeId as defaultMakeId,
+  restoreTask,
   toFormValues,
   updateTask,
 } from './utils/tasks';
@@ -33,6 +36,9 @@ type AppProps = {
 /** What the user tried to do while the edit form had unsaved changes. */
 type PendingAction = { kind: 'select' | 'edit'; id: string };
 
+/** The last deleted task and where it was, so Undo can put it back in the same place. */
+type DeletedTask = { task: Task; index: number };
+
 export function App({ initialTasks, today, makeId = defaultMakeId }: AppProps) {
   // The function form builds the sample tasks only once, on the first render.
   const [tasks, setTasks] = useState<Task[]>(() => initialTasks ?? createSampleTasks(today));
@@ -42,6 +48,8 @@ export function App({ initialTasks, today, makeId = defaultMakeId }: AppProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editIsDirty, setEditIsDirty] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  // Only the latest delete can be undone, so one slot is enough.
+  const [lastDeleted, setLastDeleted] = useState<DeletedTask | null>(null);
   const [announcement, setAnnouncement] = useState<Announcement>({ text: '', id: 0 });
   // A new object every time, so asking twice for the same element still re-renders and focuses.
   const [focusRequest, setFocusRequest] = useState<{ elementId: string } | null>(null);
@@ -159,6 +167,37 @@ export function App({ initialTasks, today, makeId = defaultMakeId }: AppProps) {
     if (action !== null) runAction(action);
   }
 
+  /** The task to focus when `id` leaves the visible list: the next one, else the previous one. */
+  function neighbourOf(id: string): Task | null {
+    const index = visibleTasks.findIndex((task) => task.id === id);
+    return visibleTasks[index + 1] ?? visibleTasks[index - 1] ?? null;
+  }
+
+  function handleDelete(id: string) {
+    const index = tasks.findIndex((task) => task.id === id);
+    const task = tasks[index];
+    if (task === undefined) return;
+    const neighbour = neighbourOf(id);
+
+    setTasks((old) => deleteTask(old, id));
+    setLastDeleted({ task, index });
+    if (selectedId === id) setSelectedId(null);
+    if (editingId === id) stopEditing();
+    announce('Task deleted');
+    // Focus must not be lost (it was on the Delete button, which is now gone).
+    requestFocus(neighbour !== null ? focusIds.select(neighbour.id) : focusIds.listHeading);
+  }
+
+  function handleUndo() {
+    if (lastDeleted === null) return;
+    const { task, index } = lastDeleted;
+    setTasks((old) => restoreTask(old, task, index));
+    setLastDeleted(null);
+    announce('Task restored');
+    // If "Hide done tasks" hides it, the effect falls back to the list heading.
+    requestFocus(focusIds.select(task.id));
+  }
+
   function toggleHideDone() {
     setHideDone((h) => !h);
   }
@@ -184,6 +223,14 @@ export function App({ initialTasks, today, makeId = defaultMakeId }: AppProps) {
           <p role="status" className="list-status">
             {getListStatusText(tasks.length, visibleTasks.length)}
           </p>
+          {lastDeleted !== null && (
+            <UndoBar
+              key={lastDeleted.task.id}
+              message="Task deleted."
+              onUndo={handleUndo}
+              onTimeout={() => setLastDeleted(null)}
+            />
+          )}
           {hiddenCount > 0 && <HiddenTasksNote hiddenCount={hiddenCount} onShow={toggleHideDone} />}
           {visibleTasks.length > 0 && (
             <TaskList
@@ -192,6 +239,7 @@ export function App({ initialTasks, today, makeId = defaultMakeId }: AppProps) {
               editingId={editingId}
               onSelect={(id) => guardedAction({ kind: 'select', id })}
               onEdit={(id) => guardedAction({ kind: 'edit', id })}
+              onDelete={handleDelete}
               today={today}
             />
           )}

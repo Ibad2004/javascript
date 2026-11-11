@@ -200,6 +200,11 @@ button:disabled {
   background: #f3f4f6;
 }
 
+.task-actions .delete-button {
+  color: #b91c1c;
+  border-color: #b91c1c;
+}
+
 .editing-tag {
   font-weight: 600;
   color: #1d4ed8;
@@ -358,4 +363,33 @@ button:disabled {
 
 .bar-buttons button {
   padding: 0.25rem 0.75rem;
+}
+
+.undo-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  background: #1f2937;
+  color: #fff;
+}
+
+.undo-bar p {
+  margin: 0;
+}
+
+.undo-bar button {
+  padding: 0.25rem 0.75rem;
+  border: 1px solid #fff;
+  border-radius: 0.375rem;
+  background: #fff;
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.undo-bar button:focus-visible {
+  outline-color: #93c5fd;
 }

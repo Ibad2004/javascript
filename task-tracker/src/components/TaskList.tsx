@@ -7,11 +7,12 @@ type TaskListProps = {
   editingId: string | null;
   onSelect: (id: string) => void;
   onEdit: (id: string) => void;
+  onDelete: (id: string) => void;
   /** The user's local date, "YYYY-MM-DD". */
   today: string;
 };
 
-export function TaskList({ tasks, selectedId, editingId, onSelect, onEdit, today }: TaskListProps) {
+export function TaskList({ tasks, selectedId, editingId, ...handlers }: TaskListProps) {
   return (
     <ul className="task-list">
       {tasks.map((task) => (
@@ -22,9 +23,7 @@ export function TaskList({ tasks, selectedId, editingId, onSelect, onEdit, today
           task={task}
           isSelected={task.id === selectedId}
           isEditing={task.id === editingId}
-          onSelect={onSelect}
-          onEdit={onEdit}
-          today={today}
+          {...handlers}
         />
       ))}
     </ul>

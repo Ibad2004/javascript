@@ -8,6 +8,7 @@ import { TaskItem } from './TaskItem';
 function renderItem(task: Task, isSelected = false) {
   const onSelect = vi.fn();
   const onEdit = vi.fn();
+  const onDelete = vi.fn();
   render(
     <ul>
       <TaskItem
@@ -16,11 +17,12 @@ function renderItem(task: Task, isSelected = false) {
         isEditing={false}
         onSelect={onSelect}
         onEdit={onEdit}
+        onDelete={onDelete}
         today={FAKE_TODAY}
       />
     </ul>,
   );
-  return { onSelect, onEdit };
+  return { onSelect, onEdit, onDelete };
 }
 
 describe('TaskItem', () => {
@@ -81,5 +83,15 @@ describe('TaskItem', () => {
     renderItem(makeTask({ id: '1', title: long }));
     expect(screen.getByText(long)).toHaveAttribute('dir', 'auto');
     expect(screen.getByRole('button', { name: `Edit ${long}` })).toBeInTheDocument();
+  });
+
+  it('has a Delete button named after the task, outside the select button', async () => {
+    const user = userEvent.setup();
+    const { onDelete, onSelect } = renderItem(makeTask({ id: 'abc', title: 'Buy milk' }));
+    const del = screen.getByRole('button', { name: 'Delete Buy milk' });
+    expect(screen.getByRole('button', { name: /^Buy milk/ })).not.toContainElement(del);
+    await user.click(del);
+    expect(onDelete).toHaveBeenCalledWith('abc');
+    expect(onSelect).not.toHaveBeenCalled();
   });
 });

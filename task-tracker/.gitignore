@@ -6,6 +6,10 @@ coverage
 
 # Environment files (may hold secrets)
 .env*
+!.env.example
+
+# The live mock-API data (built from db.seed.json by npm run db:reset)
+db.json
 
 # Logs
 *.log

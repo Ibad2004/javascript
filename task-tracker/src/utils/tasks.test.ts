@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FAKE_TODAY, makeTask } from '../test/makeTask';
 import type { Task, TaskFormValues } from '../types';
+import { getChangedFields, replaceTask, setDone } from './tasks';
 import {
   EMPTY_FORM_VALUES,
   MESSAGES,
@@ -340,5 +341,44 @@ describe('validateTask', () => {
   it('does not call the task being edited a duplicate of itself', () => {
     expect(check({ title: 'Buy milk' }, 'a').warnings.title).toBeUndefined();
     expect(check({ title: 'Call Ali' }, 'a').warnings.title).toBe(MESSAGES.duplicateTitle);
+  });
+});
+
+describe('helpers for saving to the server', () => {
+  const task = makeTask({
+    id: 'a',
+    title: 'Old',
+    description: 'D',
+    priority: 'low',
+    dueDate: null,
+  });
+
+  it('getChangedFields returns only what changed (nothing → {})', () => {
+    const same = { title: 'Old', description: 'D', priority: task.priority, dueDate: null };
+    expect(getChangedFields(task, same)).toEqual({});
+    expect(getChangedFields(task, { ...same, title: 'New', dueDate: '2026-11-20' })).toEqual({
+      title: 'New',
+      dueDate: '2026-11-20',
+    });
+    // Clearing a date is a change too (null is sent, not left out).
+    expect(
+      getChangedFields({ ...task, dueDate: '2026-11-20' }, { ...same, dueDate: null }),
+    ).toEqual({ dueDate: null });
+  });
+
+  it('setDone sets an exact value and never changes the input array', () => {
+    const tasks = [task, makeTask({ id: 'b' })];
+    const result = setDone(tasks, 'a', true);
+    expect(result[0]?.done).toBe(true);
+    expect(setDone(result, 'a', true)[0]?.done).toBe(true); // not a flip
+    expect(tasks[0]?.done).toBe(false);
+  });
+
+  it('replaceTask swaps in the server version by id', () => {
+    const saved = { ...task, title: 'From server' };
+    expect(replaceTask([task, makeTask({ id: 'b' })], saved).map((t) => t.title)).toEqual([
+      'From server',
+      'Task b',
+    ]);
   });
 });

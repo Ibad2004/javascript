@@ -20,7 +20,7 @@ function hideDoneButton() {
 
 describe('App: marking tasks done', () => {
   it('ticking updates the summary live and announces it; unticking too', async () => {
-    const { user } = renderApp(tasks);
+    const { user } = await renderApp(tasks);
     expect(screen.getByText('1 of 3 done')).toBeInTheDocument();
 
     await user.click(checkbox('Task A'));
@@ -34,20 +34,20 @@ describe('App: marking tasks done', () => {
   });
 
   it('works with the keyboard (Space)', async () => {
-    const { user } = renderApp(tasks);
+    const { user } = await renderApp(tasks);
     checkbox('Task B').focus();
     await user.keyboard(' ');
     expect(checkbox('Task B')).toBeChecked();
   });
 
   it('a done task moves below the not-done ones (the list stays sorted)', async () => {
-    const { user } = renderApp(tasks);
+    const { user } = await renderApp(tasks);
     await user.click(checkbox('Task A'));
     expect(listedTitles()).toEqual(['Task B', 'Task A', 'Task C']);
   });
 
   it('with "Hide done tasks" on, a ticked task disappears and the hidden note updates', async () => {
-    const { user } = renderApp(tasks);
+    const { user } = await renderApp(tasks);
     await user.click(hideDoneButton());
     expect(screen.getByText(/1 done task hidden/)).toBeInTheDocument();
 
@@ -62,7 +62,7 @@ describe('App: marking tasks done', () => {
   });
 
   it('hiding the very last not-done task moves focus to the list heading', async () => {
-    const { user } = renderApp([makeTask({ id: 'x', title: 'Only one' })]);
+    const { user } = await renderApp([makeTask({ id: 'x', title: 'Only one' })]);
     await user.click(hideDoneButton());
     await user.click(checkbox('Only one'));
     expect(screen.getByText('Your only task is done, so it is hidden.')).toBeInTheDocument();
@@ -70,7 +70,7 @@ describe('App: marking tasks done', () => {
   });
 
   it('lost update: open Edit, tick the task done, click Save -> it stays done', async () => {
-    const { user } = renderApp(tasks);
+    const { user } = await renderApp(tasks);
     await user.click(screen.getByRole('button', { name: 'Edit Task A' }));
     const title = within(detailPanel()).getByLabelText('Title');
     await user.type(title, ' edited');
@@ -83,7 +83,7 @@ describe('App: marking tasks done', () => {
   });
 
   it('ticking the edited task while done tasks are hidden keeps the edit form and its draft', async () => {
-    const { user } = renderApp(tasks);
+    const { user } = await renderApp(tasks);
     await user.click(hideDoneButton());
     await user.click(screen.getByRole('button', { name: 'Edit Task A' }));
     await user.type(within(detailPanel()).getByLabelText('Title'), ' draft');

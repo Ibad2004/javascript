@@ -411,3 +411,52 @@ button:disabled {
 .undo-bar button:focus-visible {
   outline-color: #93c5fd;
 }
+
+/* Day 13: loading, load errors, save errors and busy rows. */
+.load-status {
+  color: #4b5563;
+}
+
+.load-error,
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #b91c1c;
+  border-left-width: 4px;
+  border-radius: 0.375rem;
+  background: #fef2f2;
+  color: #7f1d1d;
+}
+
+.load-error p,
+.notice p {
+  margin: 0;
+  flex: 1 1 16rem;
+}
+
+.data-warning {
+  margin: 0.25rem 0;
+  font-size: 0.875rem;
+  color: #92400e;
+}
+
+.form-error {
+  margin: 0;
+  font-weight: 600;
+  color: #b91c1c;
+}
+
+.saving-tag {
+  font-style: italic;
+}
+
+/* aria-disabled keeps focus on the control, so the "disabled" look comes from CSS. */
+[aria-disabled='true'],
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

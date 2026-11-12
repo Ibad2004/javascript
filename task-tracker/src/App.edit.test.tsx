@@ -29,7 +29,7 @@ afterEach(() => {
 
 describe('App: editing tasks', () => {
   it('"Edit" opens the task prefilled in the detail panel, with focus in the title', async () => {
-    const { user } = renderApp(tasks);
+    const { user } = await renderApp(tasks);
     await user.click(screen.getByRole('button', { name: 'Edit Write report' }));
 
     expect(within(detailPanel()).getByRole('heading', { name: 'Edit task' })).toBeInTheDocument();
@@ -42,7 +42,7 @@ describe('App: editing tasks', () => {
   });
 
   it('Save stores the trimmed values, announces it and puts focus back on the task', async () => {
-    const { user } = renderApp(tasks);
+    const { user } = await renderApp(tasks);
     await user.click(screen.getByRole('button', { name: 'Edit Write report' }));
     await user.clear(editTitle());
     await user.type(editTitle(), '  Write the report  ');
@@ -57,7 +57,7 @@ describe('App: editing tasks', () => {
   });
 
   it('Escape cancels: old values kept, focus back on the Edit button', async () => {
-    const { user } = renderApp(tasks);
+    const { user } = await renderApp(tasks);
     await user.click(screen.getByRole('button', { name: 'Edit Write report' }));
     await user.type(editTitle(), ' CHANGED{Escape}');
 
@@ -67,7 +67,7 @@ describe('App: editing tasks', () => {
   });
 
   it('Cancel does the same as Escape', async () => {
-    const { user } = renderApp(tasks);
+    const { user } = await renderApp(tasks);
     await user.click(screen.getByRole('button', { name: 'Edit Write report' }));
     await user.type(editTitle(), ' CHANGED');
     await user.click(within(detailPanel()).getByRole('button', { name: 'Cancel' }));
@@ -76,7 +76,7 @@ describe('App: editing tasks', () => {
   });
 
   it('cannot save an empty title (same validation as add)', async () => {
-    const { user } = renderApp(tasks);
+    const { user } = await renderApp(tasks);
     await user.click(screen.getByRole('button', { name: 'Edit Write report' }));
     await user.clear(editTitle());
     await user.type(editTitle(), '   {Enter}');
@@ -86,7 +86,7 @@ describe('App: editing tasks', () => {
   });
 
   it('only one task is edited at a time (no changes: the switch is direct)', async () => {
-    const { user } = renderApp(tasks);
+    const { user } = await renderApp(tasks);
     await user.click(screen.getByRole('button', { name: 'Edit Write report' }));
     await user.click(screen.getByRole('button', { name: 'Edit Call the bank' }));
     expect(within(detailPanel()).getAllByLabelText('Title')).toHaveLength(1);
@@ -94,7 +94,7 @@ describe('App: editing tasks', () => {
   });
 
   it('selecting another task without changes closes the edit', async () => {
-    const { user } = renderApp(tasks);
+    const { user } = await renderApp(tasks);
     await user.click(screen.getByRole('button', { name: 'Edit Write report' }));
     await user.click(screen.getByRole('button', { name: /^Call the bank/ }));
     expect(
@@ -107,7 +107,7 @@ describe('App: editing tasks', () => {
     async function startDirtyEdit() {
       const confirmSpy = vi.spyOn(window, 'confirm');
       const alertSpy = vi.spyOn(window, 'alert');
-      const result = renderApp(tasks);
+      const result = await renderApp(tasks);
       await result.user.click(screen.getByRole('button', { name: 'Edit Write report' }));
       await result.user.type(editTitle(), ' v2');
       return { ...result, confirmSpy, alertSpy };

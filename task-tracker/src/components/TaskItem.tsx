@@ -14,6 +14,12 @@ type TaskItemProps = {
   onDelete: (id: string) => void;
   /** The user's local date, "YYYY-MM-DD". */
   today: string;
+  /**
+   * A request for this task is running. Its checkbox, Edit and Delete are disabled until it
+   * ends, so two requests for one task never overlap. aria-disabled (not `disabled`) keeps
+   * keyboard focus on the control; App ignores the click while the task is busy.
+   */
+  busy?: boolean;
 };
 
 /**
@@ -30,17 +36,19 @@ export function TaskItem({
   onToggleDone,
   onDelete,
   today,
+  busy = false,
 }: TaskItemProps) {
   const dueStatus = getDueStatus(task, today);
 
   return (
-    <li className={`task-item${task.done ? ' is-done' : ''}`}>
+    <li className={`task-item${task.done ? ' is-done' : ''}`} aria-busy={busy}>
       {/* The label text is hidden on screen (the title is right next to it) but read by screen readers. */}
       <label className="task-check">
         <input
           type="checkbox"
           id={focusIds.done(task.id)}
           checked={task.done}
+          aria-disabled={busy}
           onChange={() => onToggleDone(task.id)}
         />
         <span className="visually-hidden">Mark {task.title} as done</span>
@@ -62,6 +70,7 @@ export function TaskItem({
           <span>Priority: {PRIORITY_LABELS[task.priority]}</span>
           <span className={`due due-${dueStatus}`}>{getDueLabel(task, today)}</span>
           {isEditing && <span className="editing-tag">Editing</span>}
+          {busy && <span className="saving-tag">Saving…</span>}
         </span>
       </button>
       <div className="task-actions">
@@ -70,6 +79,7 @@ export function TaskItem({
           type="button"
           id={focusIds.edit(task.id)}
           aria-label={`Edit ${task.title}`}
+          aria-disabled={busy}
           onClick={() => onEdit(task.id)}
         >
           Edit
@@ -79,6 +89,7 @@ export function TaskItem({
           id={focusIds.remove(task.id)}
           className="delete-button"
           aria-label={`Delete ${task.title}`}
+          aria-disabled={busy}
           onClick={() => onDelete(task.id)}
         >
           Delete

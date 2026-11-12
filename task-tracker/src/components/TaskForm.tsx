@@ -16,8 +16,12 @@ type TaskFormProps = {
   initialValues?: TaskFormValues;
   /** "Add task" or "Save". */
   submitLabel: string;
-  /** Called only with valid, trimmed values. */
-  onSubmit: (input: TaskInput) => void;
+  /**
+   * Called only with valid, trimmed values. It may return a Promise (a server request):
+   * the form shows "Saving…" until it settles. A returned string is an error message:
+   * it is shown and the typed text is KEPT. null (or nothing) means saved.
+   */
+  onSubmit: (input: TaskInput) => Promise<string | null> | void;
   /** When given, a Cancel button is shown and Escape cancels too. */
   onCancel?: () => void;
   /** Tells the parent whether the values differ from initialValues (for the unsaved-changes bar). */
@@ -59,6 +63,11 @@ export function TaskForm({
   const [dateIsBad, setDateIsBad] = useState(false);
   // True right after a successful add, until the user types again (see handleSubmit).
   const justAddedRef = useRef(false);
+  // While the server request runs: the button is disabled and shows "Saving…".
+  const [isSaving, setIsSaving] = useState(false);
+  // The ref blocks a second submit at once, before React has re-rendered the disabled button.
+  const savingRef = useRef(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const dueDateRef = useRef<HTMLInputElement>(null);
@@ -85,9 +94,10 @@ export function TaskForm({
     setField('dueDate', event.currentTarget.value);
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     // Stop the browser from reloading the page.
     event.preventDefault();
+    if (savingRef.current) return;
 
     // A double click on "Add task" submits twice. The first submit already cleared the
     // form, so the second one would only show "Title is required". Ignore it instead.
@@ -106,7 +116,24 @@ export function TaskForm({
       return;
     }
 
-    onSubmit(toTaskInput(values));
+    savingRef.current = true;
+    setIsSaving(true);
+    setSubmitError(null);
+    let error: string | null;
+    try {
+      error = (await onSubmit(toTaskInput(values))) ?? null;
+    } catch {
+      error = 'Something went wrong. Try again.';
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
+    }
+    if (error !== null) {
+      // Saving failed: show why and keep everything the user typed.
+      setSubmitError(error);
+      titleRef.current?.focus();
+      return;
+    }
 
     if (clearOnSubmit) {
       setValues(EMPTY_FORM_VALUES);
@@ -159,6 +186,7 @@ export function TaskForm({
       ref={ref}
       className="task-form"
       noValidate
+      aria-busy={isSaving}
       onSubmit={handleSubmit}
       onKeyDown={handleKeyDown}
     >
@@ -233,8 +261,11 @@ export function TaskForm({
       />
       {message('dueDate')}
 
+      {submitError !== null && <p className="form-error">{submitError}</p>}
       <div className="form-buttons">
-        <button type="submit">{submitLabel}</button>
+        <button type="submit" disabled={isSaving}>
+          {isSaving ? 'Saving…' : submitLabel}
+        </button>
         {onCancel !== undefined && (
           <button type="button" onClick={onCancel}>
             Cancel

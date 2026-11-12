@@ -1,8 +1,7 @@
-import { render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { App } from './App';
-import { FAKE_TODAY, makeTask } from './test/makeTask';
+import { makeTask } from './test/makeTask';
+import { renderApp as renderWithServer } from './test/renderApp';
 import type { Task } from './types';
 
 const tasks: Task[] = [
@@ -11,10 +10,9 @@ const tasks: Task[] = [
   makeTask({ id: 'c', title: 'Clean desk', done: true, dueDate: null }),
 ];
 
-function renderApp(initialTasks: Task[] = tasks) {
-  const user = userEvent.setup();
-  render(<App initialTasks={initialTasks} today={FAKE_TODAY} />);
-  return { user };
+/** The server starts with these tasks; resolves once the list has loaded. */
+function renderApp(serverTasks: Task[] = tasks) {
+  return renderWithServer(serverTasks);
 }
 
 function toggleButton() {
@@ -26,15 +24,15 @@ function detailPanel() {
 }
 
 describe('App', () => {
-  it('shows the empty-state message when there are no tasks', () => {
-    renderApp([]);
+  it('shows the empty-state message when there are no tasks', async () => {
+    await renderApp([]);
     expect(screen.getByText('No tasks yet. Add your first task below.')).toBeInTheDocument();
     expect(screen.getByText('No tasks yet')).toBeInTheDocument();
     expect(screen.queryByRole('list')).not.toBeInTheDocument();
   });
 
-  it('lists the tasks sorted: not-done first, then by due date', () => {
-    renderApp();
+  it('lists the tasks sorted: not-done first, then by due date', async () => {
+    await renderApp();
     const items = within(screen.getByRole('list')).getAllByRole('listitem');
     expect(items.map((item) => item.textContent)).toEqual([
       expect.stringContaining('Write report'),
@@ -45,7 +43,7 @@ describe('App', () => {
   });
 
   it('toggles done tasks and updates aria-pressed', async () => {
-    const { user } = renderApp();
+    const { user } = await renderApp();
     expect(toggleButton()).toHaveTextContent('Hide done tasks');
     expect(toggleButton()).toHaveAttribute('aria-pressed', 'false');
 
@@ -61,7 +59,7 @@ describe('App', () => {
   });
 
   it('shows "N done tasks hidden" and the "Show them" button brings them back', async () => {
-    const { user } = renderApp();
+    const { user } = await renderApp();
     await user.click(toggleButton());
     expect(screen.getByText(/2 done tasks hidden/)).toBeInTheDocument();
 
@@ -72,13 +70,13 @@ describe('App', () => {
   });
 
   it('uses the singular for one hidden task', async () => {
-    const { user } = renderApp([makeTask({ id: 'x', done: true }), makeTask({ id: 'y' })]);
+    const { user } = await renderApp([makeTask({ id: 'x', done: true }), makeTask({ id: 'y' })]);
     await user.click(toggleButton());
     expect(screen.getByText(/1 done task hidden/)).toBeInTheDocument();
   });
 
   it('says clearly when every task is hidden', async () => {
-    const { user } = renderApp([
+    const { user } = await renderApp([
       makeTask({ id: 'x', done: true }),
       makeTask({ id: 'y', done: true }),
     ]);
@@ -89,7 +87,7 @@ describe('App', () => {
   });
 
   it('shows a task in the detail panel and deselects it on a second click', async () => {
-    const { user } = renderApp();
+    const { user } = await renderApp();
     const task = screen.getByRole('button', { name: /^Write report/ });
 
     await user.click(task);
@@ -104,7 +102,7 @@ describe('App', () => {
   });
 
   it('selecting another task moves the selection', async () => {
-    const { user } = renderApp();
+    const { user } = await renderApp();
     await user.click(screen.getByRole('button', { name: /^Write report/ }));
     await user.click(screen.getByRole('button', { name: /^Clean desk/ }));
     expect(screen.getByRole('button', { name: /^Write report/ })).toHaveAttribute(
@@ -115,7 +113,7 @@ describe('App', () => {
   });
 
   it('clears the detail (no stale task) when the filter hides the selected task', async () => {
-    const { user } = renderApp();
+    const { user } = await renderApp();
     await user.click(screen.getByRole('button', { name: /^Call the bank/ }));
     expect(
       within(detailPanel()).getByRole('heading', { name: 'Call the bank' }),
@@ -127,7 +125,7 @@ describe('App', () => {
   });
 
   it('lets a keyboard user reach a task with Tab and select it with Enter', async () => {
-    const { user } = renderApp();
+    const { user } = await renderApp();
     await user.tab(); // the toggle button
     await user.tab(); // the first task's "done" checkbox
     await user.tab(); // the first task

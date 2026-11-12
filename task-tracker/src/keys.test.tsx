@@ -17,7 +17,7 @@ describe('keys', () => {
   ];
 
   it('start editing B, delete A above it: the form still shows B (and its unsaved draft)', async () => {
-    const { user } = renderApp(tasks);
+    const { user } = await renderApp(tasks);
     await user.click(screen.getByRole('button', { name: 'Edit Task B' }));
     const title = within(detailPanel()).getByLabelText('Title');
     await user.type(title, ' (draft)');

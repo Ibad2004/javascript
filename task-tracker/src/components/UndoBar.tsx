@@ -9,6 +9,8 @@ type UndoBarProps = {
   /** Called when the time is up. */
   onTimeout: () => void;
   durationMs?: number;
+  /** The delete request is still running: Undo waits for it (one request per task). */
+  busy?: boolean;
 };
 
 /**
@@ -22,6 +24,7 @@ export function UndoBar({
   onUndo,
   onTimeout,
   durationMs = UNDO_TIMEOUT_MS,
+  busy = false,
 }: UndoBarProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [hasFocus, setHasFocus] = useState(false);
@@ -58,7 +61,7 @@ export function UndoBar({
       onBlur={handleBlur}
     >
       <p>{message}</p>
-      <button type="button" onClick={onUndo}>
+      <button type="button" aria-disabled={busy} onClick={onUndo}>
         Undo
       </button>
     </div>

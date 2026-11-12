@@ -5,6 +5,8 @@ type TaskListProps = {
   tasks: readonly Task[];
   selectedId: string | null;
   editingId: string | null;
+  /** Tasks with a request running (see TaskItem's `busy`). */
+  busyIds: ReadonlySet<string>;
   onSelect: (id: string) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
@@ -13,7 +15,7 @@ type TaskListProps = {
   today: string;
 };
 
-export function TaskList({ tasks, selectedId, editingId, ...handlers }: TaskListProps) {
+export function TaskList({ tasks, selectedId, editingId, busyIds, ...handlers }: TaskListProps) {
   return (
     <ul className="task-list">
       {tasks.map((task) => (
@@ -24,6 +26,7 @@ export function TaskList({ tasks, selectedId, editingId, ...handlers }: TaskList
           task={task}
           isSelected={task.id === selectedId}
           isEditing={task.id === editingId}
+          busy={busyIds.has(task.id)}
           {...handlers}
         />
       ))}

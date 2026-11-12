@@ -1,7 +1,8 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { expect } from 'vitest';
 import { App } from '../App';
-import type { Task } from '../types';
+import { startFakeServer } from './fakeServer';
 import { FAKE_TODAY } from './makeTask';
 
 type Options = {
@@ -9,15 +10,26 @@ type Options = {
   advanceTimers?: (ms: number) => unknown;
 };
 
-/** Renders the App with fake ids ("new-1", "new-2", ...) and the fake today. */
-export function renderApp(initialTasks: Task[], options: Options = {}) {
+/**
+ * Starts a fake json-server holding `serverData`, renders the App with fake ids
+ * ("new-1", "new-2", ...) and the fake today, and waits until the list has loaded.
+ * Call vi.restoreAllMocks() in afterEach (done in setup.ts) to remove the fetch spy.
+ */
+export async function renderApp(serverData: readonly unknown[], options: Options = {}) {
+  const server = startFakeServer(serverData);
   const user = userEvent.setup(
     options.advanceTimers ? { advanceTimers: options.advanceTimers } : {},
   );
   let nextId = 0;
   const makeId = () => `new-${++nextId}`;
-  const result = render(<App initialTasks={initialTasks} today={FAKE_TODAY} makeId={makeId} />);
-  return { user, ...result };
+  const result = render(<App today={FAKE_TODAY} makeId={makeId} />);
+  await waitForLoad();
+  return { user, server, ...result };
+}
+
+/** Waits until "Loading tasks…" is gone (the list or the error is on screen). */
+export async function waitForLoad() {
+  await waitFor(() => expect(screen.queryByText('Loading tasks…')).not.toBeInTheDocument());
 }
 
 export function taskList() {

@@ -157,6 +157,29 @@ export function toggleDone(tasks: readonly Task[], id: string): Task[] {
   return tasks.map((task) => (task.id === id ? { ...task, done: !task.done } : task));
 }
 
+/** Sets `done` to an exact value (not a flip), so a rollback can never flip the wrong way. */
+export function setDone(tasks: readonly Task[], id: string, done: boolean): Task[] {
+  return tasks.map((task) => (task.id === id ? { ...task, done } : task));
+}
+
+/** Puts the server's version of a task in place of ours (same id). */
+export function replaceTask(tasks: readonly Task[], saved: Task): Task[] {
+  return tasks.map((task) => (task.id === saved.id ? saved : task));
+}
+
+/**
+ * Only the fields the user really changed, for a PATCH. Sending the whole old object
+ * would overwrite a change made in the meantime (e.g. "done" ticked in another tab).
+ */
+export function getChangedFields(task: Task, input: TaskInput): Partial<TaskInput> {
+  const changes: Partial<TaskInput> = {};
+  if (input.title !== task.title) changes.title = input.title;
+  if (input.description !== task.description) changes.description = input.description;
+  if (input.priority !== task.priority) changes.priority = input.priority;
+  if (input.dueDate !== task.dueDate) changes.dueDate = input.dueDate;
+  return changes;
+}
+
 export const MESSAGES = {
   titleRequired: 'Title is required',
   titleTooLong: `Title must be ${TITLE_MAX} characters or less`,

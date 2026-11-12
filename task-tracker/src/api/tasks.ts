@@ -99,7 +99,12 @@ async function request(path: string, { method = 'GET', body, signal }: RequestOp
     } catch (error) {
       throw toError(error);
     }
-    if (!response.ok) throw new ApiError(kindForStatus(response.status), response.status);
+    if (!response.ok) {
+      // We never read an error body (json-server sends an HTML stack trace on 500).
+      // Cancel it so the connection is freed instead of waiting for the unread data.
+      await response.body?.cancel().catch(() => {});
+      throw new ApiError(kindForStatus(response.status), response.status);
+    }
 
     let text: string;
     try {

@@ -164,7 +164,8 @@ page (App)  →  src/api/tasks.ts  →  fetch  →  json-server :3001  →  db.j
   `createTask`, `updateTask` and `deleteTask` and never see a raw `Response`.
 - Every request has an **8 s timeout**, combined with the caller's `AbortSignal` in one
   `AbortController` (a `setTimeout`, so the tests can use fake timers).
-- `response.ok` is checked first. The body is read as text and parsed as JSON; if that fails, the
+- `response.ok` is checked first. On an error status the unread body is cancelled
+  (`response.body?.cancel()`), so the connection is freed. The body is read as text and parsed as JSON; if that fails, the
   user sees "The server sent data the app can't read." instead of a crash.
 - The body is `unknown` until a **type guard** (`isTask`) says it is a task. No `as` casts. In the
   list, bad items (wrong types, no id, empty title, an id used twice) are **skipped** and counted,
@@ -409,31 +410,31 @@ Tests in `src/keys.test.tsx`:
 
 ## Tests
 
-**225 tests in 18 files** (Day 12 had 165 in 15), run with Vitest + React Testing Library + jsdom.
+**227 tests in 18 files** (Day 12 had 165 in 15), run with Vitest + React Testing Library + jsdom.
 No test calls a real server: the network is replaced with `vi.spyOn(globalThis, 'fetch')`, either
 directly or through `src/test/fakeServer.ts`, a small in-memory json-server (same 404 and
 duplicate-id 500 answers as the real one) that can also fail, hang or hold a request.
 
-| File                                  | Tests | What it checks                                                                                                                                                                                 |
-| ------------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/utils/tasks.test.ts`             | 35    | sorting, filtering, summary texts, addTask, updateTask, deleteTask, restoreTask, toggleDone (frozen arrays), validateTask, countChars, makeId, **plus** getChangedFields, setDone, replaceTask |
-| `src/api/tasks.test.ts`               | 24    | **Day 13.** every API function: ok, 404, 500, server off, 8 s timeout, non-JSON, bad items skipped, duplicate ids, extra fields dropped, PATCH body = only the changes, caller abort           |
-| `src/components/TaskForm.test.tsx`    | 24    | labels, submit prevented, trimming, required title, counters, emoji, paste not cut, 100/500 limits, invalid and half-typed dates, warnings, double click, edit mode, Escape                    |
-| `src/App.save.test.tsx`               | 20    | **Day 13.** "Saving…", failed add/edit keep the text, PATCH only changed fields, optimistic done/delete + rollback, Undo with the same id, 404 from another tab, double clicks                 |
-| `src/utils/dates.test.ts`             | 17    | formatting, null, invalid dates, leap years, local today, addDays, overdue / today with a fake today                                                                                           |
-| `scripts/seed.test.mjs`               | 14    | **Day 13** (was `sampleTasks.test.ts`, 15). The seed: 6 to 8 tasks, unique ids, valid dates, edge cases present, one due today + one overdue for 8 "todays", local date, broken seed           |
-| `src/App.load.test.tsx`               | 14    | **Day 13.** loading → ready, error → Try again, empty list, StrictMode double effect, abort on unmount, 8 s timeout, non-JSON, bad items warning, reload keeps changes                         |
-| `src/App.edit.test.tsx`               | 13    | prefilled form, focus, Save, Escape/Cancel, empty title blocked, one edit at a time, unsaved-changes bar (Save / Discard / invalid), no `window.confirm`                                       |
-| `src/App.delete.test.tsx`             | 12    | delete + announce, focus next/previous/heading, empty state, Undo position, 5 s timer, pause on hover and focus, latest only, selected/edited task, no timer leak                              |
-| `src/components/TaskItem.test.tsx`    | 12    | text status/priority, overdue, due today, aria-pressed + dir, keyboard, Edit/Delete/checkbox names, row layout (no control inside another)                                                     |
-| `src/App.test.tsx`                    | 10    | empty list, sort order, toggle + aria-pressed, hidden note + Show them, all hidden, select / deselect, stale detail cleared, keyboard                                                          |
-| `src/App.add.test.tsx`                | 7     | add + trim + focus + announce, Enter, spaces-only title, double click, empty state goes away, duplicate allowed, header note                                                                   |
-| `src/App.done.test.tsx`               | 7     | summary live, Space, sort after tick, hide done + tick, focus, lost update (edit + tick + Save stays done), edited task hidden keeps its draft                                                 |
-| `src/components/TaskDetail.test.tsx`  | 4     | null message, "No description" (empty and spaces only), full detail with line breaks                                                                                                           |
-| `src/components/TaskSummary.test.tsx` | 4     | 0 tasks, 1 of 1, some done, all done                                                                                                                                                           |
-| `src/keys.test.tsx`                   | 3     | the keys demo (see "Why keys matter")                                                                                                                                                          |
-| `src/utils/scroll.test.ts`            | 3     | smooth scroll, reduced motion, no scroll on wide screens                                                                                                                                       |
-| `src/utils/plural.test.ts`            | 2     | 0 / 1 / 2 and a custom plural                                                                                                                                                                  |
+| File                                  | Tests | What it checks                                                                                                                                                                                        |
+| ------------------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/utils/tasks.test.ts`             | 35    | sorting, filtering, summary texts, addTask, updateTask, deleteTask, restoreTask, toggleDone (frozen arrays), validateTask, countChars, makeId, **plus** getChangedFields, setDone, replaceTask        |
+| `src/api/tasks.test.ts`               | 26    | **Day 13.** every API function: ok, 404, 500 (body cancelled), server off, 8 s timeout, non-JSON, bad items skipped, duplicate ids, extra fields dropped, PATCH body = only the changes, caller abort |
+| `src/components/TaskForm.test.tsx`    | 24    | labels, submit prevented, trimming, required title, counters, emoji, paste not cut, 100/500 limits, invalid and half-typed dates, warnings, double click, edit mode, Escape                           |
+| `src/App.save.test.tsx`               | 20    | **Day 13.** "Saving…", failed add/edit keep the text, PATCH only changed fields, optimistic done/delete + rollback, Undo with the same id, 404 from another tab, double clicks                        |
+| `src/utils/dates.test.ts`             | 17    | formatting, null, invalid dates, leap years, local today, addDays, overdue / today with a fake today                                                                                                  |
+| `scripts/seed.test.mjs`               | 14    | **Day 13** (was `sampleTasks.test.ts`, 15). The seed: 6 to 8 tasks, unique ids, valid dates, edge cases present, one due today + one overdue for 8 "todays", local date, broken seed                  |
+| `src/App.load.test.tsx`               | 14    | **Day 13.** loading → ready, error → Try again, empty list, StrictMode double effect, abort on unmount, 8 s timeout, non-JSON, bad items warning, reload keeps changes                                |
+| `src/App.edit.test.tsx`               | 13    | prefilled form, focus, Save, Escape/Cancel, empty title blocked, one edit at a time, unsaved-changes bar (Save / Discard / invalid), no `window.confirm`                                              |
+| `src/App.delete.test.tsx`             | 12    | delete + announce, focus next/previous/heading, empty state, Undo position, 5 s timer, pause on hover and focus, latest only, selected/edited task, no timer leak                                     |
+| `src/components/TaskItem.test.tsx`    | 12    | text status/priority, overdue, due today, aria-pressed + dir, keyboard, Edit/Delete/checkbox names, row layout (no control inside another)                                                            |
+| `src/App.test.tsx`                    | 10    | empty list, sort order, toggle + aria-pressed, hidden note + Show them, all hidden, select / deselect, stale detail cleared, keyboard                                                                 |
+| `src/App.add.test.tsx`                | 7     | add + trim + focus + announce, Enter, spaces-only title, double click, empty state goes away, duplicate allowed, header note                                                                          |
+| `src/App.done.test.tsx`               | 7     | summary live, Space, sort after tick, hide done + tick, focus, lost update (edit + tick + Save stays done), edited task hidden keeps its draft                                                        |
+| `src/components/TaskDetail.test.tsx`  | 4     | null message, "No description" (empty and spaces only), full detail with line breaks                                                                                                                  |
+| `src/components/TaskSummary.test.tsx` | 4     | 0 tasks, 1 of 1, some done, all done                                                                                                                                                                  |
+| `src/keys.test.tsx`                   | 3     | the keys demo (see "Why keys matter")                                                                                                                                                                 |
+| `src/utils/scroll.test.ts`            | 3     | smooth scroll, reduced motion, no scroll on wide screens                                                                                                                                              |
+| `src/utils/plural.test.ts`            | 2     | 0 / 1 / 2 and a custom plural                                                                                                                                                                         |
 
 Every date test uses a fake today (`2026-11-10`), so the tests never depend on the real date. The
 Undo tests use Vitest fake timers (see "What broke").
@@ -472,7 +473,7 @@ Undo tests use Vitest fake timers (see "What broke").
 | The edit form gets a fixed key instead of `key={task.id}`         | 2                          |
 | **Day 13:** the one-request-per-task guard on "done" switched off | 1 (2 PATCHes instead of 1) |
 
-## What broke
+## What broke on Day 13
 
 Real problems and surprises from Day 13:
 

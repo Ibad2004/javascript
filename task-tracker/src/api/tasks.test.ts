@@ -195,6 +195,26 @@ describe('updateTask', () => {
   });
 });
 
+describe('error responses', () => {
+  it.each([404, 500])(
+    'a %i cancels the unread body, so the connection is freed',
+    async (status) => {
+      const cancel = vi.fn();
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('<html>stack trace</html>'));
+        },
+        cancel,
+      });
+      mockFetch().mockResolvedValue(new Response(body, { status }));
+
+      const error = await failure(updateTask('a', { done: true }));
+      expect(error.status).toBe(status);
+      expect(cancel).toHaveBeenCalledTimes(1);
+    },
+  );
+});
+
 describe('deleteTask', () => {
   it('ok: DELETE /tasks/:id ({} or an empty body)', async () => {
     const fetchSpy = mockFetch()

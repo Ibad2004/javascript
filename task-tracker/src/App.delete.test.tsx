@@ -1,4 +1,4 @@
-import { act, screen, within } from '@testing-library/react';
+import { act, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   advanceTimers,
@@ -6,7 +6,7 @@ import {
   useFakeTimersWithTestingLibrary,
 } from './test/fakeTimers';
 import { makeTask } from './test/makeTask';
-import { detailPanel, listedTitles, liveRegion, renderApp } from './test/renderApp';
+import { listedTitles, liveRegion, pageHeading, renderApp, taskLink } from './test/renderApp';
 import type { Task } from './types';
 
 // Sorted by due date, so the list order is A, B, C.
@@ -25,8 +25,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function setup(initialTasks: Task[] = tasks) {
-  return renderApp(initialTasks, { advanceTimers });
+async function setup(initialTasks: Task[] = tasks, route = '/') {
+  return renderApp(initialTasks, { advanceTimers, route });
 }
 
 function wait(ms: number) {
@@ -56,13 +56,13 @@ describe('App: deleting tasks', () => {
   it('moves focus to the next task, then the previous one, then the list heading', async () => {
     const { user } = await setup();
     await user.click(screen.getByRole('button', { name: 'Delete Task B' }));
-    expect(screen.getByRole('button', { name: /^Task C/ })).toHaveFocus();
+    expect(taskLink('Task C')).toHaveFocus();
 
     await user.click(screen.getByRole('button', { name: 'Delete Task C' }));
-    expect(screen.getByRole('button', { name: /^Task A/ })).toHaveFocus();
+    expect(taskLink('Task A')).toHaveFocus();
 
     await user.click(screen.getByRole('button', { name: 'Delete Task A' }));
-    expect(screen.getByRole('heading', { name: 'Tasks' })).toHaveFocus();
+    expect(pageHeading()).toHaveFocus();
   });
 
   it('deleting every task shows the empty state again', async () => {
@@ -86,7 +86,7 @@ describe('App: deleting tasks', () => {
     expect(listedTitles()).toEqual(['Task A', 'Task B', 'Task C']);
     expect(undoButton()).not.toBeInTheDocument();
     expect(liveRegion()).toHaveTextContent('Task restored');
-    expect(screen.getByRole('button', { name: /^Task B/ })).toHaveFocus();
+    expect(taskLink('Task B')).toHaveFocus();
   });
 
   it('Undo still works after deleting everything (the old position no longer exists)', async () => {
@@ -130,7 +130,7 @@ describe('App: deleting tasks', () => {
     await user.click(screen.getByRole('button', { name: 'Delete Task B' }));
     // Focus moved to Task C. The Undo bar sits just above the list, so from the
     // first task (A) Shift+Tab twice (past A's checkbox) reaches the Undo button.
-    await user.click(screen.getByRole('button', { name: /^Task A/ }));
+    act(() => taskLink('Task A').focus());
     await user.tab({ shift: true });
     await user.tab({ shift: true });
     expect(undoButton()).toHaveFocus();
@@ -139,7 +139,7 @@ describe('App: deleting tasks', () => {
 
     await user.keyboard('{Enter}');
     expect(listedTitles()).toEqual(['Task A', 'Task B', 'Task C']);
-    expect(screen.getByRole('button', { name: /^Task B/ })).toHaveFocus();
+    expect(taskLink('Task B')).toHaveFocus();
   });
 
   it('only the latest delete can be undone, and it gets a fresh 5 seconds', async () => {
@@ -155,22 +155,31 @@ describe('App: deleting tasks', () => {
     expect(listedTitles()).toEqual(['Task B', 'Task C']);
   });
 
-  it('deleting the selected task clears the detail panel', async () => {
-    const { user } = await setup();
-    await user.click(screen.getByRole('button', { name: /^Task B/ }));
-    await user.click(screen.getByRole('button', { name: 'Delete Task B' }));
-    expect(within(detailPanel()).getByText('Select a task to see its details')).toBeInTheDocument();
+  it('Delete on the task page goes to the list, where the Undo bar is (it lives in the context)', async () => {
+    const { user, server } = await setup(tasks, '/tasks/b');
+    expect(pageHeading()).toHaveTextContent('Task B');
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+
+    expect(pageHeading()).toHaveTextContent('Tasks');
+    expect(listedTitles()).toEqual(['Task A', 'Task C']);
+    expect(undoButton()).toBeInTheDocument();
+    expect(liveRegion()).toHaveTextContent('Task deleted');
+    expect(screen.queryByText('Task not found')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(listedTitles()).toEqual(['Task A', 'Task B', 'Task C']);
+    expect(taskLink('Task B')).toHaveFocus();
+    await vi.waitFor(() => expect(server.task('b')).toMatchObject({ title: 'Task B' }));
   });
 
-  it('deleting the task being edited cancels the edit without a crash', async () => {
-    const { user } = await setup();
-    await user.click(screen.getByRole('button', { name: 'Edit Task B' }));
-    await user.type(within(detailPanel()).getByLabelText('Title'), ' changed');
-    await user.click(screen.getByRole('button', { name: 'Delete Task B' }));
+  it('deleting the task being edited drops the draft without a crash; Undo brings the OLD values', async () => {
+    const { user } = await setup(tasks, '/tasks/b');
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    await user.type(screen.getByLabelText('Title'), ' changed');
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
 
-    expect(within(detailPanel()).queryByLabelText('Title')).not.toBeInTheDocument();
+    expect(pageHeading()).toHaveTextContent('Tasks');
     expect(screen.queryByRole('group', { name: /unsaved/ })).not.toBeInTheDocument();
-    // After Undo the task comes back with its OLD values (the draft was not saved).
     await user.click(screen.getByRole('button', { name: 'Undo' }));
     expect(listedTitles()).toContain('Task B');
   });

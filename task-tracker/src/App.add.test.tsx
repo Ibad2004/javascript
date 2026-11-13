@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { makeTask } from './test/makeTask';
-import { addForm, detailPanel, listedTitles, liveRegion, renderApp } from './test/renderApp';
+import { addForm, listedTitles, liveRegion, renderApp, taskLink } from './test/renderApp';
 
 describe('App: adding tasks', () => {
   it('adds a trimmed task, clears the form, focuses the title and announces it', async () => {
@@ -19,8 +19,8 @@ describe('App: adding tasks', () => {
     expect(screen.getByText('0 of 2 done')).toBeInTheDocument();
 
     // A description of only spaces is stored as "" and shows "No description".
-    await user.click(screen.getByRole('button', { name: /^Buy milk/ }));
-    expect(within(detailPanel()).getByText('No description')).toBeInTheDocument();
+    await user.click(taskLink('Buy milk'));
+    expect(screen.getByText('No description')).toBeInTheDocument();
   });
 
   it('adds with Enter in the title field', async () => {

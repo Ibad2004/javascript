@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { makeTask } from './test/makeTask';
-import { addForm, detailPanel, listedTitles, liveRegion, renderApp } from './test/renderApp';
+import { addForm, listedTitles, liveRegion, pageHeading, renderApp } from './test/renderApp';
 
 const tasks = [
   makeTask({ id: 'a', title: 'Task A', dueDate: '2026-11-11' }),
@@ -93,65 +93,72 @@ describe('App: adding waits for the server', () => {
   });
 });
 
-describe('App: editing waits for the server', () => {
+describe('App: editing (on the task page) waits for the server', () => {
+  /** Opens task `id`'s page directly and clicks Edit. */
+  async function openEdit(id = 'a') {
+    const result = await renderApp(tasks, { route: `/tasks/${id}` });
+    await result.user.click(screen.getByRole('button', { name: 'Edit' }));
+    return result;
+  }
+
+  function editTitle() {
+    return screen.getByLabelText('Title');
+  }
+
   it('PATCHes ONLY the changed fields', async () => {
-    const { user, server } = await renderApp(tasks);
-    await user.click(screen.getByRole('button', { name: 'Edit Task A' }));
-    await user.type(within(detailPanel()).getByLabelText('Title'), ' v2');
-    await user.selectOptions(within(detailPanel()).getByLabelText('Priority'), 'high');
-    await user.click(within(detailPanel()).getByRole('button', { name: 'Save' }));
+    const { user, server } = await openEdit();
+    await user.type(editTitle(), ' v2');
+    await user.selectOptions(screen.getByLabelText('Priority'), 'high');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(server.writes()).toEqual([
       { method: 'PATCH', path: '/tasks/a', body: { title: 'Task A v2', priority: 'high' } },
     ]);
-    expect(listedTitles()).toContain('Task A v2');
+    expect(pageHeading()).toHaveTextContent('Task A v2');
   });
 
   it('Save with no changes sends nothing and just closes the form', async () => {
-    const { user, server } = await renderApp(tasks);
-    await user.click(screen.getByRole('button', { name: 'Edit Task A' }));
-    await user.click(within(detailPanel()).getByRole('button', { name: 'Save' }));
+    const { user, server } = await openEdit();
+    await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(server.writes()).toEqual([]);
-    expect(within(detailPanel()).queryByLabelText('Title')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Title')).not.toBeInTheDocument();
   });
 
   it('shows "Saving…"; a failed save keeps the form open with the typed text', async () => {
-    const { user, server } = await renderApp(tasks);
-    await user.click(screen.getByRole('button', { name: 'Edit Task A' }));
-    await user.type(within(detailPanel()).getByLabelText('Title'), ' v2');
+    const { user, server } = await openEdit();
+    await user.type(editTitle(), ' v2');
     const hold = server.holdNext();
-    await user.click(within(detailPanel()).getByRole('button', { name: 'Save' }));
-    expect(within(detailPanel()).getByRole('button', { name: 'Saving…' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled();
 
     hold.fail(503);
     const message = "Couldn't save the changes. The server had a problem. Try again.";
-    expect(await within(detailPanel()).findByText(message)).toBeInTheDocument();
-    expect(within(detailPanel()).getByLabelText('Title')).toHaveValue('Task A v2');
-    expect(listedTitles()).toContain('Task A');
+    expect(await within(screen.getByRole('main')).findByText(message)).toBeInTheDocument();
+    expect(editTitle()).toHaveValue('Task A v2');
+    expect(pageHeading()).toHaveTextContent('Task A');
     expect(liveRegion()).toHaveTextContent(message);
   });
 
   it('a double click on Save sends ONE request', async () => {
-    const { user, server } = await renderApp(tasks);
-    await user.click(screen.getByRole('button', { name: 'Edit Task A' }));
-    await user.type(within(detailPanel()).getByLabelText('Title'), '!');
+    const { user, server } = await openEdit();
+    await user.type(editTitle(), '!');
     const hold = server.holdNext();
-    await user.dblClick(within(detailPanel()).getByRole('button', { name: 'Save' }));
+    await user.dblClick(screen.getByRole('button', { name: 'Save' }));
     hold.release();
-    await waitFor(() => expect(listedTitles()).toContain('Task A!'));
+    await waitFor(() => expect(pageHeading()).toHaveTextContent('Task A!'));
     expect(server.writes()).toHaveLength(1);
   });
 
-  it('404 (deleted in another tab): message, task removed, edit form closed', async () => {
-    const { user, server } = await renderApp(tasks);
-    await user.click(screen.getByRole('button', { name: 'Edit Task B' }));
-    await user.type(within(detailPanel()).getByLabelText('Title'), ' v2');
+  it('404 (deleted in another tab): back to the list with the message, task removed', async () => {
+    const { user, server } = await openEdit('b');
+    await user.type(editTitle(), ' v2');
     server.deleteFromAnotherTab('b');
-    await user.click(within(detailPanel()).getByRole('button', { name: 'Save' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
+    expect(await screen.findByRole('heading', { level: 1, name: 'Tasks' })).toBeInTheDocument();
     expect(listedTitles()).toEqual(['Task A', 'Task C']);
-    expect(within(detailPanel()).queryByLabelText('Title')).not.toBeInTheDocument();
-    expect(within(detailPanel()).getByText('Select a task to see its details')).toBeInTheDocument();
+    // Only the add form is left on the list page.
+    expect(screen.getAllByLabelText('Title')).toHaveLength(1);
     expect(notice()).toHaveTextContent('This task no longer exists');
     expect(liveRegion()).toHaveTextContent('This task no longer exists');
   });
@@ -189,10 +196,6 @@ describe('App: done is optimistic', () => {
     expect(server.writes()).toHaveLength(1);
     expect(checkbox('Task A')).toBeChecked();
     expect(checkbox('Task A')).toHaveAttribute('aria-disabled', 'true');
-    expect(screen.getByRole('button', { name: 'Edit Task A' })).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    );
     expect(screen.getByRole('button', { name: 'Delete Task A' })).toHaveAttribute(
       'aria-disabled',
       'true',
@@ -209,14 +212,12 @@ describe('App: done is optimistic', () => {
     expect(checkbox('Task A')).not.toBeChecked();
   });
 
-  it('Edit and Delete do nothing while that task is saving', async () => {
+  it('Delete does nothing while that task is saving', async () => {
     const { user, server } = await renderApp(tasks);
     const hold = server.holdNext();
     await user.click(checkbox('Task A'));
     await user.click(screen.getByRole('button', { name: 'Delete Task A' }));
-    await user.click(screen.getByRole('button', { name: 'Edit Task A' }));
     expect(listedTitles()).toContain('Task A');
-    expect(within(detailPanel()).queryByLabelText('Title')).not.toBeInTheDocument();
     hold.release();
     await waitFor(() => expect(checkbox('Task A')).toHaveAttribute('aria-disabled', 'false'));
     expect(server.writes()).toHaveLength(1);
@@ -224,12 +225,10 @@ describe('App: done is optimistic', () => {
 
   it('404 on done: message and the task is removed', async () => {
     const { user, server } = await renderApp(tasks);
-    await user.click(screen.getByRole('button', { name: /^Task B/ }));
     server.deleteFromAnotherTab('b');
     await user.click(checkbox('Task B'));
     expect(listedTitles()).toEqual(['Task A', 'Task C']);
     expect(notice()).toHaveTextContent('This task no longer exists');
-    expect(within(detailPanel()).getByText('Select a task to see its details')).toBeInTheDocument();
   });
 
   it('the message can be dismissed', async () => {

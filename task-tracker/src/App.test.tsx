@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { makeTask } from './test/makeTask';
-import { renderApp as renderWithServer } from './test/renderApp';
+import { pageHeading, renderApp as renderWithServer, taskLink } from './test/renderApp';
 import type { Task } from './types';
 
 const tasks: Task[] = [
@@ -17,10 +17,6 @@ function renderApp(serverTasks: Task[] = tasks) {
 
 function toggleButton() {
   return screen.getByRole('button', { name: /done tasks$/ });
-}
-
-function detailPanel() {
-  return screen.getByRole('region', { name: 'Task details' });
 }
 
 describe('App', () => {
@@ -86,53 +82,22 @@ describe('App', () => {
     expect(screen.queryByRole('list')).not.toBeInTheDocument();
   });
 
-  it('shows a task in the detail panel and deselects it on a second click', async () => {
+  it('each task is a link; clicking it opens the task page (the old side panel is gone)', async () => {
     const { user } = await renderApp();
-    const task = screen.getByRole('button', { name: /^Write report/ });
-
-    await user.click(task);
-    expect(task).toHaveAttribute('aria-pressed', 'true');
-    expect(
-      within(detailPanel()).getByRole('heading', { name: 'Write report' }),
-    ).toBeInTheDocument();
-
-    await user.click(task);
-    expect(task).toHaveAttribute('aria-pressed', 'false');
-    expect(within(detailPanel()).getByText('Select a task to see its details')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Task details' })).not.toBeInTheDocument();
+    await user.click(taskLink('Write report'));
+    expect(pageHeading()).toHaveTextContent('Write report');
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
   });
 
-  it('selecting another task moves the selection', async () => {
-    const { user } = await renderApp();
-    await user.click(screen.getByRole('button', { name: /^Write report/ }));
-    await user.click(screen.getByRole('button', { name: /^Clean desk/ }));
-    expect(screen.getByRole('button', { name: /^Write report/ })).toHaveAttribute(
-      'aria-pressed',
-      'false',
-    );
-    expect(within(detailPanel()).getByRole('heading', { name: 'Clean desk' })).toBeInTheDocument();
-  });
-
-  it('clears the detail (no stale task) when the filter hides the selected task', async () => {
-    const { user } = await renderApp();
-    await user.click(screen.getByRole('button', { name: /^Call the bank/ }));
-    expect(
-      within(detailPanel()).getByRole('heading', { name: 'Call the bank' }),
-    ).toBeInTheDocument();
-
-    await user.click(toggleButton());
-    expect(within(detailPanel()).getByText('Select a task to see its details')).toBeInTheDocument();
-    expect(within(detailPanel()).queryByText('Call the bank')).not.toBeInTheDocument();
-  });
-
-  it('lets a keyboard user reach a task with Tab and select it with Enter', async () => {
+  it('lets a keyboard user reach a task with Tab and open it with Enter', async () => {
     const { user } = await renderApp();
     await user.tab(); // the toggle button
     await user.tab(); // the first task's "done" checkbox
-    await user.tab(); // the first task
-    expect(screen.getByRole('button', { name: /^Write report/ })).toHaveFocus();
+    await user.tab(); // the first task's link
+    expect(taskLink('Write report')).toHaveFocus();
     await user.keyboard('{Enter}');
-    expect(
-      within(detailPanel()).getByRole('heading', { name: 'Write report' }),
-    ).toBeInTheDocument();
+    expect(pageHeading()).toHaveTextContent('Write report');
+    expect(pageHeading()).toHaveFocus();
   });
 });

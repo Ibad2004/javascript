@@ -1,7 +1,7 @@
-import { screen, within } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { makeTask } from './test/makeTask';
-import { detailPanel, listedTitles, liveRegion, renderApp } from './test/renderApp';
+import { listedTitles, liveRegion, renderApp, taskLink } from './test/renderApp';
 import type { Task } from './types';
 
 const tasks: Task[] = [
@@ -58,7 +58,7 @@ describe('App: marking tasks done', () => {
     expect(screen.getByText('2 of 3 done')).toBeInTheDocument();
     expect(screen.getByText('Showing 1 task')).toBeInTheDocument();
     // Focus does not get lost with the removed checkbox.
-    expect(screen.getByRole('button', { name: /^Task B/ })).toHaveFocus();
+    expect(taskLink('Task B')).toHaveFocus();
   });
 
   it('hiding the very last not-done task moves focus to the list heading', async () => {
@@ -66,33 +66,20 @@ describe('App: marking tasks done', () => {
     await user.click(hideDoneButton());
     await user.click(checkbox('Only one'));
     expect(screen.getByText('Your only task is done, so it is hidden.')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Tasks' })).toHaveFocus();
+    expect(screen.getByRole('heading', { level: 1, name: 'Tasks' })).toHaveFocus();
   });
 
-  it('lost update: open Edit, tick the task done, click Save -> it stays done', async () => {
-    const { user } = await renderApp(tasks);
-    await user.click(screen.getByRole('button', { name: 'Edit Task A' }));
-    const title = within(detailPanel()).getByLabelText('Title');
-    await user.type(title, ' edited');
+  it('lost update: on the task page, open Edit, tick done, click Save -> it stays done', async () => {
+    const { user } = await renderApp(tasks, { route: '/tasks/a' });
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    await user.type(screen.getByLabelText('Title'), ' edited');
 
-    await user.click(checkbox('Task A'));
-    await user.click(within(detailPanel()).getByRole('button', { name: 'Save' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Mark as done' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
+    expect(screen.getByRole('checkbox', { name: 'Mark as done' })).toBeChecked();
+    await user.click(screen.getByRole('link', { name: /Back to tasks/ }));
     expect(checkbox('Task A edited')).toBeChecked();
     expect(screen.getByText('2 of 3 done')).toBeInTheDocument();
-  });
-
-  it('ticking the edited task while done tasks are hidden keeps the edit form and its draft', async () => {
-    const { user } = await renderApp(tasks);
-    await user.click(hideDoneButton());
-    await user.click(screen.getByRole('button', { name: 'Edit Task A' }));
-    await user.type(within(detailPanel()).getByLabelText('Title'), ' draft');
-    await user.click(checkbox('Task A'));
-
-    expect(listedTitles()).toEqual(['Task B']);
-    expect(within(detailPanel()).getByLabelText('Title')).toHaveValue('Task A draft');
-    await user.click(within(detailPanel()).getByRole('button', { name: 'Save' }));
-    await user.click(hideDoneButton());
-    expect(checkbox('Task A draft')).toBeChecked();
   });
 });

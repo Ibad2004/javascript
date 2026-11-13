@@ -1,6 +1,8 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect } from 'vitest';
+import type { ReactElement } from 'react';
+import { MemoryRouter } from 'react-router';
 import { App } from '../App';
 import { startFakeServer } from './fakeServer';
 import { FAKE_TODAY } from './makeTask';
@@ -8,7 +10,14 @@ import { FAKE_TODAY } from './makeTask';
 type Options = {
   /** Pass vi.advanceTimersByTime when the test uses fake timers. */
   advanceTimers?: (ms: number) => unknown;
+  /** The URL the app starts on (default "/"). */
+  route?: string;
 };
+
+/** The app inside a MemoryRouter: tests choose the URL, no real browser history. */
+export function inRouter(ui: ReactElement, route = '/') {
+  return <MemoryRouter initialEntries={[route]}>{ui}</MemoryRouter>;
+}
 
 /**
  * Starts a fake json-server holding `serverData`, renders the App with fake ids
@@ -22,14 +31,14 @@ export async function renderApp(serverData: readonly unknown[], options: Options
   );
   let nextId = 0;
   const makeId = () => `new-${++nextId}`;
-  const result = render(<App today={FAKE_TODAY} makeId={makeId} />);
+  const result = render(inRouter(<App today={FAKE_TODAY} makeId={makeId} />, options.route));
   await waitForLoad();
   return { user, server, ...result };
 }
 
-/** Waits until "Loading tasks…" is gone (the list or the error is on screen). */
+/** Waits until "Loading tasks…" / "Loading task…" is gone (the page or the error is shown). */
 export async function waitForLoad() {
-  await waitFor(() => expect(screen.queryByText('Loading tasks…')).not.toBeInTheDocument());
+  await waitFor(() => expect(screen.queryByText(/^Loading tasks?…$/)).not.toBeInTheDocument());
 }
 
 export function taskList() {
@@ -45,8 +54,18 @@ export function listedTitles(): string[] {
     .map((item) => item.querySelector('.task-title')?.textContent ?? '');
 }
 
-export function detailPanel() {
-  return screen.getByRole('region', { name: 'Task details' });
+/** The page's <h1>. */
+export function pageHeading() {
+  return screen.getByRole('heading', { level: 1 });
+}
+
+/** The link to a task's page in the list (its name starts with the title). */
+export function taskLink(title: string) {
+  return screen.getByRole('link', { name: new RegExp(`^${escapeRegExp(title)}`) });
+}
+
+function escapeRegExp(text: string) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 export function addForm() {

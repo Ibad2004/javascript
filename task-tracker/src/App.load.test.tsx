@@ -12,7 +12,7 @@ import {
 import { hangingFetch, jsonResponse, mockFetch, networkError } from './test/fetchMock';
 import { startFakeServer } from './test/fakeServer';
 import { FAKE_TODAY, makeTask } from './test/makeTask';
-import { listedTitles, liveRegion, renderApp, waitForLoad } from './test/renderApp';
+import { inRouter, listedTitles, liveRegion, renderApp, waitForLoad } from './test/renderApp';
 
 const tasks = [
   makeTask({ id: 'a', title: 'Task A', dueDate: '2026-11-11' }),
@@ -30,7 +30,7 @@ function tasksPanel() {
 describe('App: loading the tasks (useEffect + fetch)', () => {
   it('loading → ready: shows "Loading tasks…" with aria-busy, then the list', async () => {
     startFakeServer(tasks);
-    render(<App today={FAKE_TODAY} />);
+    render(inRouter(<App today={FAKE_TODAY} />));
     expect(screen.getByText('Loading tasks…')).toBeInTheDocument();
     expect(tasksPanel()).toHaveAttribute('aria-busy', 'true');
     // Nothing that needs the list is shown while it loads.
@@ -53,7 +53,7 @@ describe('App: loading the tasks (useEffect + fetch)', () => {
     const server = startFakeServer(tasks);
     server.goOffline();
     const user = userEvent.setup();
-    render(<App today={FAKE_TODAY} />);
+    render(inRouter(<App today={FAKE_TODAY} />));
     await waitForLoad();
 
     expect(
@@ -74,7 +74,7 @@ describe('App: loading the tasks (useEffect + fetch)', () => {
     server.failNext(500);
     server.failNext(500);
     const user = userEvent.setup();
-    render(<App today={FAKE_TODAY} />);
+    render(inRouter(<App today={FAKE_TODAY} />));
     await waitForLoad();
     expect(screen.getByText('The server had a problem. Try again.')).toBeInTheDocument();
 
@@ -92,7 +92,7 @@ describe('App: loading the tasks (useEffect + fetch)', () => {
     const server = startFakeServer(tasks);
     server.failNext(500);
     const user = userEvent.setup();
-    render(<App today={FAKE_TODAY} />);
+    render(inRouter(<App today={FAKE_TODAY} />));
     await waitForLoad();
 
     const hold = server.holdNext();
@@ -110,11 +110,7 @@ describe('App: loading the tasks (useEffect + fetch)', () => {
       .mockImplementationOnce(hangingFetch)
       .mockResolvedValueOnce(jsonResponse(tasks));
     const consoleError = vi.spyOn(console, 'error');
-    render(
-      <StrictMode>
-        <App today={FAKE_TODAY} />
-      </StrictMode>,
-    );
+    render(<StrictMode>{inRouter(<App today={FAKE_TODAY} />)}</StrictMode>);
     await waitForLoad();
 
     expect(fetchSpy).toHaveBeenCalledTimes(2);
@@ -131,7 +127,7 @@ describe('App: loading the tasks (useEffect + fetch)', () => {
       () => new Promise<Response>((resolve) => (answer = resolve)),
     );
     const consoleError = vi.spyOn(console, 'error');
-    const { unmount, container } = render(<App today={FAKE_TODAY} />);
+    const { unmount, container } = render(inRouter(<App today={FAKE_TODAY} />));
     unmount();
     expect(fetchSpy.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
 
@@ -144,7 +140,7 @@ describe('App: loading the tasks (useEffect + fetch)', () => {
     useFakeTimersWithTestingLibrary();
     const fetchSpy = mockFetch().mockImplementationOnce(hangingFetch);
     const user = userEvent.setup({ advanceTimers });
-    render(<App today={FAKE_TODAY} />);
+    render(inRouter(<App today={FAKE_TODAY} />));
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS - 1);
@@ -163,7 +159,7 @@ describe('App: loading the tasks (useEffect + fetch)', () => {
 
   it('non-JSON from the server is an error message, not a blank screen', async () => {
     mockFetch().mockResolvedValue(new Response('<!doctype html><p>Proxy error</p>'));
-    render(<App today={FAKE_TODAY} />);
+    render(inRouter(<App today={FAKE_TODAY} />));
     await waitForLoad();
     expect(screen.getByText("The server sent data the app can't read.")).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
@@ -214,7 +210,7 @@ describe('App: loading the tasks (useEffect + fetch)', () => {
 
   it('a network error on load never shows the raw "Failed to fetch"', async () => {
     mockFetch().mockImplementation(networkError);
-    render(<App today={FAKE_TODAY} />);
+    render(inRouter(<App today={FAKE_TODAY} />));
     await waitForLoad();
     expect(screen.queryByText(/Failed to fetch/)).not.toBeInTheDocument();
   });

@@ -1,30 +1,22 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { FAKE_TODAY, makeTask } from '../test/makeTask';
 import type { Task } from '../types';
 import { TaskItem } from './TaskItem';
 
-function renderItem(task: Task, isSelected = false) {
-  const onSelect = vi.fn();
-  const onEdit = vi.fn();
+function renderItem(task: Task) {
   const onDelete = vi.fn();
   const onToggleDone = vi.fn();
   render(
-    <ul>
-      <TaskItem
-        task={task}
-        isSelected={isSelected}
-        isEditing={false}
-        onSelect={onSelect}
-        onEdit={onEdit}
-        onDelete={onDelete}
-        onToggleDone={onToggleDone}
-        today={FAKE_TODAY}
-      />
-    </ul>,
+    <MemoryRouter>
+      <ul>
+        <TaskItem task={task} onDelete={onDelete} onToggleDone={onToggleDone} today={FAKE_TODAY} />
+      </ul>
+    </MemoryRouter>,
   );
-  return { onSelect, onEdit, onDelete, onToggleDone };
+  return { onDelete, onToggleDone };
 }
 
 describe('TaskItem', () => {
@@ -50,65 +42,63 @@ describe('TaskItem', () => {
     expect(screen.getByText('Due today')).toBeInTheDocument();
   });
 
-  it('is a real button with aria-pressed and dir="auto" on the title', () => {
-    renderItem(makeTask({ id: '1', title: 'ہفتہ وار رپورٹ' }), true);
-    const button = screen.getByRole('button', { name: /^ہفتہ وار رپورٹ/ });
-    expect(button).toHaveAttribute('aria-pressed', 'true');
+  it('is a real link to the task page, with dir="auto" on the title', () => {
+    renderItem(makeTask({ id: '1', title: 'ہفتہ وار رپورٹ' }));
+    const link = screen.getByRole('link', { name: /^ہفتہ وار رپورٹ/ });
+    expect(link).toHaveAttribute('href', '/tasks/1');
     expect(screen.getByText('ہفتہ وار رپورٹ')).toHaveAttribute('dir', 'auto');
   });
 
-  it('can be selected with the keyboard (Tab, then Enter or Space)', async () => {
-    const user = userEvent.setup();
-    const { onSelect } = renderItem(makeTask({ id: 'abc' }));
-    await user.tab(); // the checkbox
-    await user.tab();
-    expect(screen.getByRole('button', { name: /^Task abc/ })).toHaveFocus();
-    await user.keyboard('{Enter}');
-    await user.keyboard(' ');
-    expect(onSelect).toHaveBeenCalledTimes(2);
-    expect(onSelect).toHaveBeenCalledWith('abc');
+  it('encodes an odd id in the link, so the URL stays valid', () => {
+    renderItem(makeTask({ id: 'a b/%?', title: 'Odd' }));
+    expect(screen.getByRole('link', { name: /^Odd/ })).toHaveAttribute(
+      'href',
+      '/tasks/a%20b%2F%25%3F',
+    );
   });
 
-  it('has an Edit button NEXT TO the select button, not inside it', async () => {
+  it('a keyboard user reaches the link with Tab (after the checkbox)', async () => {
     const user = userEvent.setup();
-    const { onEdit, onSelect } = renderItem(makeTask({ id: 'abc', title: 'Buy milk' }));
-    const edit = screen.getByRole('button', { name: 'Edit Buy milk' });
-    const select = screen.getByRole('button', { name: /^Buy milk/ });
-    expect(select).not.toContainElement(edit);
-    expect(edit.closest('button')).toBe(edit);
-    await user.click(edit);
-    expect(onEdit).toHaveBeenCalledWith('abc');
-    expect(onSelect).not.toHaveBeenCalled();
+    renderItem(makeTask({ id: 'abc' }));
+    await user.tab(); // the checkbox
+    await user.tab();
+    expect(screen.getByRole('link', { name: /^Task abc/ })).toHaveFocus();
+  });
+
+  it('has an Edit link NEXT TO the task link, not inside it, to the same page', () => {
+    renderItem(makeTask({ id: 'abc', title: 'Buy milk' }));
+    const edit = screen.getByRole('link', { name: 'Edit Buy milk' });
+    const link = screen.getByRole('link', { name: /^Buy milk/ });
+    expect(link).not.toContainElement(edit);
+    expect(edit).toHaveAttribute('href', '/tasks/abc');
   });
 
   it('keeps a long title and Urdu text in the row with dir="auto"', () => {
     const long = 'Refactor_'.repeat(11);
     renderItem(makeTask({ id: '1', title: long }));
     expect(screen.getByText(long)).toHaveAttribute('dir', 'auto');
-    expect(screen.getByRole('button', { name: `Edit ${long}` })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: `Edit ${long}` })).toBeInTheDocument();
   });
 
-  it('has a Delete button named after the task, outside the select button', async () => {
+  it('has a Delete button named after the task, outside the task link', async () => {
     const user = userEvent.setup();
-    const { onDelete, onSelect } = renderItem(makeTask({ id: 'abc', title: 'Buy milk' }));
+    const { onDelete } = renderItem(makeTask({ id: 'abc', title: 'Buy milk' }));
     const del = screen.getByRole('button', { name: 'Delete Buy milk' });
-    expect(screen.getByRole('button', { name: /^Buy milk/ })).not.toContainElement(del);
+    expect(screen.getByRole('link', { name: /^Buy milk/ })).not.toContainElement(del);
     await user.click(del);
     expect(onDelete).toHaveBeenCalledWith('abc');
-    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it('has a checkbox labelled "Mark <title> as done" that toggles with Space', async () => {
     const user = userEvent.setup();
-    const { onToggleDone, onSelect } = renderItem(makeTask({ id: 'abc', title: 'Buy milk' }));
+    const { onToggleDone } = renderItem(makeTask({ id: 'abc', title: 'Buy milk' }));
     const checkbox = screen.getByRole('checkbox', { name: 'Mark Buy milk as done' });
     expect(checkbox).not.toBeChecked();
-    expect(screen.getByRole('button', { name: /^Buy milk/ })).not.toContainElement(checkbox);
+    expect(screen.getByRole('link', { name: /^Buy milk/ })).not.toContainElement(checkbox);
     await user.tab();
     expect(checkbox).toHaveFocus();
     await user.keyboard(' ');
     expect(onToggleDone).toHaveBeenCalledWith('abc');
-    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it('shows a done task as checked', () => {
@@ -116,16 +106,13 @@ describe('TaskItem', () => {
     expect(screen.getByRole('checkbox', { name: 'Mark Old as done' })).toBeChecked();
   });
 
-  it('lays out the row as checkbox, select, Edit, Delete (no control inside another)', () => {
+  it('lays out the row as checkbox, link, Edit, Delete (no control inside another)', () => {
     renderItem(makeTask({ id: '1', title: 'Row' }));
     const item = screen.getByRole('listitem');
-    const controls = [...item.querySelectorAll('input, button')];
-    expect(controls.map((el) => el.getAttribute('aria-label') ?? el.getAttribute('type'))).toEqual([
-      'checkbox',
-      'button',
-      'Edit Row',
-      'Delete Row',
-    ]);
-    expect(item.querySelector('button button, button input')).toBeNull();
+    const controls = [...item.querySelectorAll('input, button, a')];
+    expect(
+      controls.map((el) => el.getAttribute('aria-label') ?? el.getAttribute('type') ?? 'link'),
+    ).toEqual(['checkbox', 'link', 'Edit Row', 'Delete Row']);
+    expect(item.querySelector('a a, a button, a input, button button, button input')).toBeNull();
   });
 });

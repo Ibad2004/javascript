@@ -620,22 +620,26 @@ Undo tests use Vitest fake timers (see "What broke").
 
 Real problems and surprises from Day 14:
 
-1. **My laptop died in the middle of Part B.** Part A was committed; Part B was only in the working
-   tree. Nothing was lost: I checked `git status` and `git diff`, read every changed file, found
-   nothing half-written, and continued from there.
-2. **A test found the same message twice.** "Task marked done, but hidden by your filters." is on
+1. **Part A: the first commit had almost nothing in it.** The first `git add` failed with a pathspec
+   error (a deleted file was already staged), so the first commit had almost nothing and the second
+   had all the code, and `package.json` wasn't committed. I reset the two commits and redid them,
+   then checked each with `git show --stat`. Now I check `git show --stat` after every commit.
+2. **My laptop died in the middle of Part B.** Work stopped mid-task with uncommitted changes.
+   Before continuing I checked `git status` and `git diff` to see exactly what was done. Lesson:
+   commit smaller and more often.
+3. **A test found the same message twice.** "Task marked done, but hidden by your filters." is on
    the page **and** in the hidden live region, so `getByText` failed with "Found multiple
    elements". The app was right; the test now looks for the message in the visible note.
-3. **Two selects were called "Priority".** My first filter test failed with "Found multiple
+4. **Two selects were called "Priority".** My first filter test failed with "Found multiple
    elements with the role combobox and name Priority": the filter and the add form's field had the
    same label. A screen reader user would hear the same. The filter is now "Filter by priority".
-4. **oxlint failed on the test helper** (`only-export-components`): I had put the small
+5. **oxlint failed on the test helper** (`only-export-components`): I had put the small
    `LocationProbe` component inside `renderApp.tsx`, next to plain functions. It has its own file now.
-5. **A "hidden by your filters" message could stay wrong.** While reviewing the code I saw that
+6. **A "hidden by your filters" message could stay wrong.** While reviewing the code I saw that
    the message was only cleared by the next task action, not by a filter change: add a task under
    "Done", click "Pending", and the visible task was still called hidden. Changing a filter now
    removes the message; a test does exactly those steps.
-6. **I broke the search on purpose** with `new RegExp(needle)`: 2 tests failed with "Invalid
+7. **I broke the search on purpose** with `new RegExp(needle)`: 2 tests failed with "Invalid
    regular expression: /c++/: Nothing to repeat". Then I put the plain `includes` back.
 
 ## What broke on Day 13

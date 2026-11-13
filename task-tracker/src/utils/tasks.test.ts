@@ -10,7 +10,6 @@ import {
   deleteTask,
   getListStatusText,
   getSummaryText,
-  getVisibleTasks,
   isValidDueDate,
   makeId,
   restoreTask,
@@ -50,18 +49,6 @@ describe('sortTasks', () => {
   });
 });
 
-describe('getVisibleTasks', () => {
-  const tasks = [makeTask({ id: '1', done: true }), makeTask({ id: '2', done: false })];
-
-  it('keeps every task when hideDone is false', () => {
-    expect(getVisibleTasks(tasks, false)).toHaveLength(2);
-  });
-
-  it('removes done tasks when hideDone is true', () => {
-    expect(getVisibleTasks(tasks, true).map((task) => task.id)).toEqual(['2']);
-  });
-});
-
 describe('getSummaryText', () => {
   it('says "No tasks yet" for 0 tasks', () => {
     expect(getSummaryText([])).toBe('No tasks yet');
@@ -85,12 +72,11 @@ describe('getSummaryText', () => {
 });
 
 describe('getListStatusText', () => {
-  it('covers empty, all hidden and the normal count with plurals', () => {
+  it('covers empty and "Showing X of Y" with plurals', () => {
     expect(getListStatusText(0, 0)).toBe('No tasks yet. Add your first task below.');
-    expect(getListStatusText(1, 0)).toBe('Your only task is done, so it is hidden.');
-    expect(getListStatusText(3, 0)).toBe('All 3 tasks are done, so they are all hidden.');
-    expect(getListStatusText(3, 1)).toBe('Showing 1 task');
-    expect(getListStatusText(3, 2)).toBe('Showing 2 tasks');
+    expect(getListStatusText(1, 1)).toBe('Showing 1 of 1 task');
+    expect(getListStatusText(8, 0)).toBe('Showing 0 of 8 tasks');
+    expect(getListStatusText(8, 2)).toBe('Showing 2 of 8 tasks');
   });
 });
 

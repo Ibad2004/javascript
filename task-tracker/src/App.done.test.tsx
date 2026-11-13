@@ -14,10 +14,6 @@ function checkbox(title: string) {
   return screen.getByRole('checkbox', { name: `Mark ${title} as done` });
 }
 
-function hideDoneButton() {
-  return screen.getByRole('button', { name: /done tasks$/ });
-}
-
 describe('App: marking tasks done', () => {
   it('ticking updates the summary live and announces it; unticking too', async () => {
     const { user } = await renderApp(tasks);
@@ -46,26 +42,25 @@ describe('App: marking tasks done', () => {
     expect(listedTitles()).toEqual(['Task B', 'Task A', 'Task C']);
   });
 
-  it('with "Hide done tasks" on, a ticked task disappears and the hidden note updates', async () => {
-    const { user } = await renderApp(tasks);
-    await user.click(hideDoneButton());
-    expect(screen.getByText(/1 done task hidden/)).toBeInTheDocument();
-
+  it('with "Pending" on, a ticked task leaves the list and the message says why', async () => {
+    const { user } = await renderApp(tasks, { route: '/?status=pending' });
     await user.click(checkbox('Task A'));
     expect(listedTitles()).toEqual(['Task B']);
-    expect(liveRegion()).toHaveTextContent('Task marked done (hidden)');
-    expect(screen.getByText(/2 done tasks hidden/)).toBeInTheDocument();
+    const message = 'Task marked done, but hidden by your filters.';
+    expect(liveRegion()).toHaveTextContent(message);
+    expect(screen.getByText(message, { selector: '.hidden-note' })).toBeInTheDocument();
     expect(screen.getByText('2 of 3 done')).toBeInTheDocument();
-    expect(screen.getByText('Showing 1 task')).toBeInTheDocument();
+    expect(screen.getByText('Showing 1 of 3 tasks')).toBeInTheDocument();
     // Focus does not get lost with the removed checkbox.
     expect(taskLink('Task B')).toHaveFocus();
   });
 
-  it('hiding the very last not-done task moves focus to the list heading', async () => {
-    const { user } = await renderApp([makeTask({ id: 'x', title: 'Only one' })]);
-    await user.click(hideDoneButton());
+  it('hiding the very last visible task moves focus to the list heading', async () => {
+    const { user } = await renderApp([makeTask({ id: 'x', title: 'Only one' })], {
+      route: '/?status=pending',
+    });
     await user.click(checkbox('Only one'));
-    expect(screen.getByText('Your only task is done, so it is hidden.')).toBeInTheDocument();
+    expect(screen.getByText(/No tasks match these filters/)).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Tasks' })).toHaveFocus();
   });
 

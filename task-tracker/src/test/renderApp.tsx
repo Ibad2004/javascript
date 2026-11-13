@@ -1,10 +1,11 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect } from 'vitest';
 import type { ReactElement } from 'react';
 import { MemoryRouter } from 'react-router';
 import { App } from '../App';
 import { startFakeServer } from './fakeServer';
+import { LocationProbe } from './LocationProbe';
 import { FAKE_TODAY } from './makeTask';
 
 type Options = {
@@ -16,7 +17,22 @@ type Options = {
 
 /** The app inside a MemoryRouter: tests choose the URL, no real browser history. */
 export function inRouter(ui: ReactElement, route = '/') {
-  return <MemoryRouter initialEntries={[route]}>{ui}</MemoryRouter>;
+  return (
+    <MemoryRouter initialEntries={[route]} useTransitions={false}>
+      {ui}
+      <LocationProbe />
+    </MemoryRouter>
+  );
+}
+
+/** The router's current path + query, e.g. "/?status=done". */
+export function currentUrl(): string {
+  return screen.getByTestId('location').textContent ?? '';
+}
+
+/** Like the browser's Back button. */
+export function historyBack() {
+  fireEvent.click(screen.getByTestId('history-back'));
 }
 
 /**

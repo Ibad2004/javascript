@@ -49,7 +49,7 @@ describe('App: adding tasks', () => {
     expect(screen.getByText('No tasks yet. Add your first task below.')).toBeInTheDocument();
     await user.type(within(addForm()).getByLabelText('Title'), 'First{Enter}');
     expect(screen.queryByText('No tasks yet. Add your first task below.')).not.toBeInTheDocument();
-    expect(screen.getByText('Showing 1 task')).toBeInTheDocument();
+    expect(screen.getByText('Showing 1 of 1 task')).toBeInTheDocument();
   });
 
   it('allows a duplicate title after the warning (both tasks are listed)', async () => {

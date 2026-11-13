@@ -8,10 +8,10 @@ This is a one-week project: every day I add to the **same app**.
 | 11  | Tracker pages with **static data**: components, JSX, props, state                                         | Done    |
 | 12  | Add, edit and delete tasks **in memory**: events, forms, controlled inputs, lists and keys                | Done    |
 | 13  | Read tasks from a mock API (**json-server**): `useEffect`, fetching, loading and error states             | Done    |
-| 14  | Filters, a task detail page and a `useTasks` hook: custom hooks, lifting state, context, **React Router** | Planned |
+| 14  | Filters, a task detail page and a `useTasks` hook: custom hooks, lifting state, context, **React Router** | Done    |
 | 15  | Styling, basic accessibility and a responsive layout, then deploy on **Vercel**                           | Planned |
 
-Days 14 and 15 are planned. Since Day 13 the tasks are saved on a local mock server (json-server), so a
+Day 15 is planned. Since Day 13 the tasks are saved on a local mock server (json-server), so a
 page refresh keeps the changes. The header says so on screen too.
 
 ## How to run
@@ -52,23 +52,32 @@ On Linux or macOS use plain `npm` (`npm ci`, `npm run dev`, `npm run check`). Vi
 ## Component tree
 
 ```
-App                      owns all the state; loads the tasks (useEffect), saves in event handlers
-├── Header               title + "Saved on the local mock server (json-server)"
-├── <p> / error box      "Loading tasks…" (aria-busy), or the error message + [Try again], in App
-├── TaskSummary          "3 of 8 done" (updates live), or "No tasks yet"  (this and below: once loaded)
-├── <p> / notice box     "2 items ... were skipped", or a failed tick/delete/Undo [Dismiss], in App
-├── <button>             "Hide done tasks" / "Show done tasks" toggle (aria-pressed), in App
-├── <p role=status>      "Showing 5 tasks", the empty message or the all-hidden message, in App
-├── UndoBar              "Task deleted. [Undo]" for 5 s, paused on hover/focus (key = deleted task id)
-├── HiddenTasksNote      "3 done tasks hidden [Show them]" (only while done tasks are hidden)
-├── TaskList             the <ul>; one TaskItem per visible task, key = task.id
-│   └── TaskItem         <li>: [checkbox] [select button: title + info] [Edit] [Delete]; "Saving…" while busy
-├── TaskDetail           the selected task, or "Select a task to see its details"
-│   │                    while editing, it shows instead:
-│   ├── UnsavedChangesBar  "You have unsaved changes [Save] [Discard]" (only when needed)
-│   └── TaskForm         EDIT mode: prefilled, "Save" + "Cancel", key = task.id
-├── TaskForm             ADD mode: the same component, empty, "Add task" / "Saving…", clears after a save
-└── LiveRegion           visually hidden role=status: "Task added", "Changes saved", "Task deleted", ...
+BrowserRouter (main.tsx)   MemoryRouter in the tests
+└── App
+    └── TasksProvider      calls useTasks() ONCE; every page reads it with useTasksContext()
+        └── AppRoutes      moves focus to the new page's <h1> after an in-app navigation
+            ├── Header     title + "Saved on the local mock server (json-server)"
+            ├── Routes
+            │   ├── "/"           TaskListPage
+            │   │   ├── <p> / error box   "Loading tasks…" (aria-busy), or the error + [Try again]
+            │   │   ├── TaskSummary       "3 of 8 done" (over ALL tasks, not the filtered ones)
+            │   │   ├── Notice            a failed save or a 404, [Dismiss]
+            │   │   ├── TaskFilters       Status [All (8)] [Pending (5)] [Done (3)] (aria-pressed),
+            │   │   │                     "Filter by priority" select, "Search by title" box
+            │   │   ├── <p role=status>   "Showing 2 of 8 tasks" or "No tasks yet…"
+            │   │   ├── <p> hidden note   "Task added, but hidden by your filters. [Show all]"
+            │   │   ├── UndoBar           "Task deleted. [Undo]" for 5 s (key = deleted task id)
+            │   │   ├── <p> no match      "No tasks match these filters. [Clear filters]"
+            │   │   ├── TaskList          the <ul>, key = task.id
+            │   │   │   └── TaskItem      [checkbox] [link: title + info] [Edit link] [Delete]
+            │   │   └── TaskForm          ADD mode, clears after a save
+            │   ├── "/tasks/:id"  TaskDetailPage (key = id)
+            │   │   ├── "← Back to tasks" link (keeps the list's filters)
+            │   │   ├── TaskDetail        the task (<h1> = title), or "Loading task…" / "Task not found"
+            │   │   ├── UnsavedChangesBar "You have unsaved changes [Save] [Discard]"
+            │   │   └── TaskForm          EDIT mode, prefilled
+            │   └── "*"           NotFoundPage   "Page not found" + "Go to your tasks"
+            └── LiveRegion  visually hidden role=status, outside the routes so messages survive a navigation
 ```
 
 **One form for add and edit.** `TaskForm` takes `initialValues`, `submitLabel`, `onSubmit` and
@@ -76,64 +85,163 @@ App                      owns all the state; loads the tasks (useEffect), saves 
 props, so the validation, counters and messages are written once.
 
 **Why the row changed.** On Day 11 each task was one `<button>`. A checkbox or an Edit button _inside_
-a `<button>` is invalid HTML (screen readers and browsers handle it badly), so each `<li>` now has four
+a `<button>` is invalid HTML (screen readers and browsers handle it badly), so each `<li>` has four
 controls next to each other. Edit, Delete and the checkbox have the task title in their accessible
 name ("Edit Buy milk", "Delete Buy milk", "Mark Buy milk as done"), so a screen reader list of
 buttons is not just "Edit, Edit, Edit".
+
+### Routes
+
+| Path         | Page             | Notes                                                                                                                                                                         |
+| ------------ | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`          | `TaskListPage`   | Filters in the query: `?status=done&priority=high&q=milk`. Defaults are left out, so the plain list is `/`. Tab title "Tasks".                                                |
+| `/tasks/:id` | `TaskDetailPage` | One task. A trailing slash works, odd ids are decoded (`/tasks/with%20space`). History state `edit: true` opens the form; `listSearch` keeps the filters for "Back to tasks". |
+| `*`          | `NotFoundPage`   | "Page not found" and a link to the list.                                                                                                                                      |
 
 Folders:
 
 ```
 src/
-  App.tsx                 the top component (state lives here)
-  main.tsx                reads today's date once and renders <App today={...} />
+  App.tsx                 TasksProvider + the routes
+  main.tsx                reads today's date once and renders <BrowserRouter><App today={...} />
   types.ts                Priority, Task, TaskInput and TaskFormValues types
   api/tasks.ts            the ONLY file that calls fetch: getTasks, createTask, updateTask,
                           deleteTask, the type guard and the friendly errors
+  hooks/useTasks.ts       all task state and actions (load, add, edit, done, delete, Undo, messages)
+  hooks/                  also useDocumentTitle and useFocusHeadingOnNavigation
+  context/TasksContext.tsx  TasksProvider + useTasksContext (throws outside the provider)
+  pages/                  TaskListPage, TaskDetailPage, NotFoundPage
   components/             one component per file, each with typed props
-  utils/tasks.ts          pure logic: addTask, updateTask, deleteTask, restoreTask, toggleDone,
-                          validateTask, makeId, countChars, sorting and filtering
-  utils/                  also dates, plurals, scrolling and the focus target ids
-  test/                   test setup, makeTask(), renderApp(), the fake json-server
-                          (fakeServer.ts, a vi.spyOn on fetch) and the fake-timer helper
+  utils/filters.ts        Day 14: read/write the URL filters, search normalising, filterTasks, counts
+  utils/tasks.ts          pure logic: addTask, updateTask, deleteTask, restoreTask, setDone,
+                          validateTask, makeId, countChars, sorting, summary texts
+  utils/                  also dates, plurals, page titles and the focus target ids
+  test/                   test setup, makeTask(), renderApp() (MemoryRouter + a LocationProbe that
+                          shows the URL and presses Back), the fake json-server, fake timers
 db.seed.json              the 8 demo tasks with "dueInDays" (tracked by git)
 db.json                   the live data json-server serves (ignored by git)
 scripts/                  db.mjs + seed.mjs: build db.json from the seed with local dates
 ```
 
-## Props and state
+## Props, state and context
 
-| Data                                                   | Kind                | Where it lives                  | Why                                                                                                                                                                                             |
-| ------------------------------------------------------ | ------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tasks`                                                | state (`useState`)  | App                             | The list, the summary, the detail and both forms need it, so it sits above all of them. Changed only with `setTasks((old) => ...)`. Since Day 13 it starts empty and is filled from the server. |
-| `loadState`, `loadAttempt`                             | state (`useState`)  | App                             | **Day 13.** `loading` / `error` (+ message) / `ready`. "Try again" adds 1 to `loadAttempt`, which the load effect depends on.                                                                   |
-| `skippedCount`                                         | state (`useState`)  | App                             | **Day 13.** How many items in `db.json` failed the type guard, for the one small warning.                                                                                                       |
-| `busyIds` (+ `busyRef`)                                | state + ref         | App → TaskList → TaskItem       | **Day 13.** Tasks with a request running. The ref answers at once (a double click), the state re-renders the rows as disabled.                                                                  |
-| `notice`                                               | state (`useState`)  | App                             | **Day 13.** The last failed tick / delete / Undo, or a 404, shown above the list until dismissed.                                                                                               |
-| `isSaving`, `submitError`                              | state (`useState`)  | each TaskForm                   | **Day 13.** "Saving…" and the disabled button while `onSubmit` runs; the server's error under the form (the typed values stay).                                                                 |
-| `hideDone`                                             | state (`useState`)  | App                             | It changes both the list and the "N hidden" note, so it lives in their shared parent.                                                                                                           |
-| `selectedId`                                           | state (`useState`)  | App                             | TaskList highlights it and TaskDetail shows it: siblings can only share data through their parent.                                                                                              |
-| `editingId`                                            | state (`useState`)  | App                             | **New.** Which task is in the edit form. One id means only one task can be edited at a time.                                                                                                    |
-| `editIsDirty`                                          | state (`useState`)  | App                             | **New.** TaskForm reports whether the edit values differ from the task. App needs it to decide if the unsaved-changes bar is shown.                                                             |
-| `pendingAction`                                        | state (`useState`)  | App                             | **New.** What the user tried to do (select or edit another task) while there were unsaved changes. Save or Discard then finishes it.                                                            |
-| `lastDeleted`                                          | state (`useState`)  | App                             | **New.** `{ task, index }` of the latest delete, so Undo can put it back at the same index. One slot: only the latest delete can be undone.                                                     |
-| `announcement`                                         | state (`useState`)  | App → LiveRegion                | **New.** The text for screen readers ("Task added"). It carries a counter, so the same text twice is read twice.                                                                                |
-| `focusRequest`                                         | state (`useState`)  | App                             | **New.** Where focus should go after add/edit/delete. An effect moves the focus after React has put the element on the page.                                                                    |
-| form values                                            | state (`useState`)  | each TaskForm                   | **New.** `title`, `description`, `priority`, `dueDate` as strings: every input is controlled. Each form owns its own draft.                                                                     |
-| `triedSubmit`, `dateIsBad`                             | state (`useState`)  | each TaskForm                   | **New.** "Title is required" shows only after a submit attempt. `dateIsBad` stores the browser's `validity.badInput` for half-typed dates.                                                      |
-| `isHovered`, `hasFocus`                                | state (`useState`)  | UndoBar                         | **New.** Either one pauses the 5 s timer. The time left is kept in a ref, so pausing does not re-render.                                                                                        |
-| `visibleTasks`                                         | derived (not state) | computed in App on every render | Filtered and sorted from `tasks` + `hideDone`. A second copy in state could get out of sync.                                                                                                    |
-| `selectedTask`, `editingTask`                          | derived (not state) | computed in App                 | Looked up by id. `selectedTask` in the _visible_ list; `editingTask` in _all_ tasks, so ticking it done while done tasks are hidden keeps the form and the draft.                               |
-| `today`                                                | prop                | main.tsx → App → children       | Read once outside React (rendering stays pure). Used for due labels and the past-date warning. Tests pass a fake date.                                                                          |
-| `makeId`                                               | prop (function)     | App                             | **New.** Makes the id of a new task (`crypto.randomUUID()`). Tests pass a fake one that gives `new-1`, `new-2`, ...                                                                             |
-| `onSelect`, `onEdit`, `onDelete`, `onToggleDone`       | prop (callback)     | App → TaskList → TaskItem       | Children cannot change App's state directly, so they call functions App gives them.                                                                                                             |
-| `initialValues`, `submitLabel`, `onSubmit`, `onCancel` | prop                | App → TaskForm                  | **New.** The only differences between the add form and the edit form.                                                                                                                           |
+Since Day 14 the task state lives in **one custom hook, `useTasks`**, called once in
+`TasksProvider`. The pages read it with `useTasksContext()` instead of passing it down through
+props. The filters are **not** React state at all: they live in the URL.
+
+| Data                                                  | Kind                        | Where it lives                     | Why                                                                                                                              |
+| ----------------------------------------------------- | --------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `tasks`                                               | state                       | useTasks → context                 | Both pages need it. Filled from the server, changed only with `setTasks((old) => ...)`.                                          |
+| `loadState`, `loadAttempt`, `skippedCount`            | state                       | useTasks → context                 | Loading / error / ready; "Try again"; how many bad items the type guard dropped.                                                 |
+| `busyIds` (+ `busyRef`)                               | state + ref                 | useTasks → TaskList → TaskItem     | Tasks with a request running. The ref answers at once (a double click), the state disables the row.                              |
+| `notice`                                              | state                       | useTasks → Notice                  | The last failed save or a 404, until dismissed or the next action.                                                               |
+| `filterNotice`                                        | state                       | useTasks → TaskListPage            | **Day 14.** `{ text, taskId }` of "…, but hidden by your filters." Cleared by the next action or any filter change.              |
+| `lastDeleted`                                         | state                       | useTasks → UndoBar                 | `{ task, index }` of the latest delete, for Undo.                                                                                |
+| `announcement`, `focusRequest`                        | state                       | useTasks → LiveRegion / an effect  | Screen reader text (with a counter, so the same text twice is read twice) and where focus goes next.                             |
+| `status`, `priority`, `q`                             | **URL** (`useSearchParams`) | TaskListPage                       | **Day 14.** Reload, Back/Forward and a shared link keep them. The URL is the only copy; `readFilters` cleans it on every render. |
+| `visibleTasks`, `counts`, `noMatch`                   | derived (not state)         | computed in TaskListPage           | `filterTasks(tasks, filters)` and `countByStatus(tasks)` during render. No effect, no second copy that could get out of sync.    |
+| `isEditing`, `isDirty`, `pendingTo`                   | state                       | TaskDetailPage                     | The edit form, unsaved changes, and the link the user tried to follow while the form was dirty.                                  |
+| `listPath`                                            | derived                     | TaskDetailPage                     | **Day 14.** `/` + the filters from history state, cleaned like the URL. Used by "Back to tasks", Delete and a 404.               |
+| form values, `isSaving`, `submitError`, `triedSubmit` | state                       | each TaskForm                      | Every input is controlled; each form owns its own draft.                                                                         |
+| `isHovered`, `hasFocus`                               | state                       | UndoBar                            | Either one pauses the 5 s timer.                                                                                                 |
+| `today`                                               | prop                        | main.tsx → App → pages             | Read once outside React. Tests pass a fake date.                                                                                 |
+| `makeId`                                              | prop (function)             | App → TasksProvider → useTasks     | `crypto.randomUUID()`; tests pass one that gives `new-1`, `new-2`, ...                                                           |
+| `filters`, `counts`, `onStatusChange`, ...            | prop                        | TaskListPage → TaskFilters         | **Day 14.** TaskFilters only shows the filters and reports changes; the page writes the URL.                                     |
+| `onToggleDone`, `onDelete`, `busy`                    | prop (callback)             | TaskListPage → TaskList → TaskItem | Children cannot change the state directly, so they call functions they are given.                                                |
 
 State is never changed in place. Every update builds a new array or object with spread, `map`,
 `filter` or `toSpliced`, and the pure functions in `src/utils/tasks.ts` are tested on **frozen**
 arrays, so a mutation would throw in the test.
 
+## Day 14: filters, a task page and a `useTasks` hook (React Router)
+
+### What works now
+
+- **Part A.** All task logic moved from `App` into `useTasks`; `TasksProvider` shares it. React
+  Router (8.5.1, exact version) gives three routes (table above). Each task title is a real link,
+  so "open in a new tab" works. The task page shows the task, edits it, ticks it and deletes it.
+  Every page sets the tab title and, after an in-app navigation, moves focus to its `<h1>`.
+- **Part B. Filters.** Status **All / Pending / Done** with counts (replaces "Hide done tasks"),
+  **Filter by priority** Any / High / Medium / Low, and **Search by title**. They combine (AND).
+  "Showing 2 of 8 tasks" above the list. No match: "No tasks match these filters." +
+  **Clear filters** (focus goes to the search box).
+- **In the URL:** `?status=done&priority=high&q=milk`. Status and priority push a history entry
+  (Back undoes them); typing in the search **replaces** it (no entry per letter).
+- **Never a silent disappearance:** if the task you just added, ticked, unticked or brought back
+  with Undo is hidden by the filters, the page says "Task added, but hidden by your filters.
+  [Show all]" (also read by screen readers). Show all clears the filters and focuses the task.
+- **"Back to tasks"** (and Delete or a 404 on the task page) returns to the list **with the same
+  filters**.
+
+### Choices I made, and why
+
+- **The URL is the only copy of the filters.** No `useState` mirror and no `useEffect` to sync
+  them: `readFilters(searchParams)` runs on every render, and `filterTasks` too. A copy in state
+  could disagree with the address bar after Back/Forward.
+- **The URL is untrusted** (typed, edited, shared). `readFilters` accepts any case (`DONE`),
+  turns unknown values into the default, uses the **first** of a repeated param, and cuts `q` to
+  100 characters without splitting an emoji. History state (`listSearch`) goes through the same
+  reader, because any page can put something there.
+- **Plain-text search, no RegExp.** `"c++"`, `"("` and `".*"` are searched as typed. The text is
+  NFKC-normalised, trimmed, runs of spaces collapsed and lower-cased on both sides, so Urdu works
+  too. The search box has `dir="auto"`.
+- **Counts on the status buttons are over all tasks**, like the summary. Counting only the
+  filtered list would make "Done (0)" under "Pending", which says nothing.
+- **Fixed button labels + `aria-pressed`** for the status buttons (the old toggle changed its own
+  label, which I said I would look at again).
+- **"Filter by priority", not "Priority".** The add form already has a select called "Priority".
+- **Edit is a link**, not a button: it opens `/tasks/:id` with `state: { edit: true }`, so the
+  form is open. It is a real URL; opening it in a new tab shows the task without the form
+  (history state does not travel to a new tab), which is safe.
+- **The scroll helper (`utils/scroll.ts`) is removed.** It scrolled the side panel into view on
+  phones. The panel is gone: the task has its own page and focus goes to its `<h1>`.
+- **No transitions in the router** (`useTransitions={false}`): the search box is controlled by the
+  URL and must update with every key press.
+
+### Edge cases (Day 14, from the user's side; all tested)
+
+| Case                                                             | What happens                                                                                             |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `?status=DONE`, `?status=finished`, `?priority=`                 | Done; All; Any. Never a crash or an empty page without a reason.                                         |
+| `?status=pending&status=done`                                    | Pending (the first one).                                                                                 |
+| `?q=` with 150 characters                                        | Cut to 100.                                                                                              |
+| Search ` BUY   milk`, `c++`, `(`, `دودھ`                         | Finds "Buy milk", "Learn C++ (basics)", the Urdu task. No RegExp error.                                  |
+| Search of only spaces                                            | Matches everything and is left out of the URL.                                                           |
+| Nothing matches                                                  | "Showing 0 of 8 tasks", "No tasks match these filters." + Clear filters → `/`, focus in the search.      |
+| Add / tick / untick / Undo a task the filters hide               | "…, but hidden by your filters. [Show all]". A ticked row's focus moves to its neighbour or the heading. |
+| Change the filters after that message                            | The message goes away (it was about the old filters).                                                    |
+| Typing in the search, then Back                                  | One Back skips the whole word (replace), not one letter at a time.                                       |
+| Open a task from a filtered list, then "Back to tasks"           | Same filters. From Edit too.                                                                             |
+| **Part A:** `/tasks/unknown`, `/tasks/a/`, `/tasks/with%20space` | "Task not found"; the task; the task.                                                                    |
+| **Part A:** open a task page while the list is loading           | "Loading task…", never "Task not found" first.                                                           |
+| **Part A:** load error on a task page                            | The message + Try again, which loads the task.                                                           |
+| **Part A:** a 404 (deleted in another tab) on the task page      | Back to the list with the message; Back does not return to the dead page.                                |
+| **Part A:** unsaved edit + "Back to tasks"                       | "You have unsaved changes [Save] [Discard]" instead of leaving.                                          |
+| **Part A:** a title over 50 characters                           | Cut with "…" in the tab title; the `<h1>` keeps it whole.                                                |
+| **Part A:** `/nope`                                              | "Page not found" + a link home.                                                                          |
+| **Part A:** `useTasksContext()` outside the provider             | A clear error that says so.                                                                              |
+
+Limits I know about: the unsaved-changes bar guards in-app links only, not the browser's Back
+button or closing the tab. Two tabs do not sync live; a change from another tab shows up on a
+reload, or as a 404 message when you touch a task the other tab deleted (Day 13).
+
+## Demo script (2 minutes)
+
+1. `npm run db:reset` and `npm run start:all`, open the URL. "Showing 8 of 8 tasks".
+2. Click **Pending**: the button is pressed, the list shrinks, the URL is `/?status=pending`.
+3. Choose **High** under "Filter by priority": both filters, `?status=pending&priority=high`.
+4. Type `c++` or `(` in the search: no error. Then a word that matches nothing: "No tasks match
+   these filters" → **Clear filters**, the cursor is back in the search.
+5. Under **Done**, add a task: "Task added, but hidden by your filters. [Show all]" → Show all.
+6. Set a filter, open a task, edit the title, click **Back to tasks**: the unsaved-changes bar.
+   Save: you are back on the list **with the same filters**.
+7. Reload: the filters stay. Press the browser's Back: the last filter change is undone.
+8. Paste `/?status=DONE&priority=urgent&q=` + a very long text: no crash, sensible defaults.
+
 ## Day 13: the tracker reads from a mock API (json-server)
+
+> The Day 11–13 sections describe the app as it was on those days. Since Day 14 the state lives in
+> `useTasks`, the side panel is the `/tasks/:id` page and "Hide done tasks" is the status filter.
 
 ### What works now
 
@@ -406,38 +514,72 @@ Tests in `src/keys.test.tsx`:
 - The date is read **once, on page load**. If the page stays open past midnight, "Due today" and
   "Overdue" still use yesterday's date: refresh the page to update them.
 - The toggle changes both its label and `aria-pressed`, as the brief asked. Some screen reader guides
-  prefer a fixed label with only `aria-pressed` changing. I will look at this again on Day 15.
+  prefer a fixed label with only `aria-pressed` changing. (Day 14: the toggle is gone; the status
+  buttons have fixed labels and only `aria-pressed` changes.)
 
 ## Tests
 
-**227 tests in 18 files** (Day 12 had 165 in 15), run with Vitest + React Testing Library + jsdom.
+**276 tests in 22 files** (Day 13 had 227 in 18), run with Vitest + React Testing Library + jsdom.
 No test calls a real server: the network is replaced with `vi.spyOn(globalThis, 'fetch')`, either
 directly or through `src/test/fakeServer.ts`, a small in-memory json-server (same 404 and
-duplicate-id 500 answers as the real one) that can also fail, hang or hold a request.
+duplicate-id 500 answers as the real one) that can also fail, hang or hold a request. Since Day 14
+the App renders inside a `MemoryRouter` (`renderApp(tasks, { route: '/?status=done' })`).
 
-| File                                  | Tests | What it checks                                                                                                                                                                                        |
-| ------------------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/utils/tasks.test.ts`             | 35    | sorting, filtering, summary texts, addTask, updateTask, deleteTask, restoreTask, toggleDone (frozen arrays), validateTask, countChars, makeId, **plus** getChangedFields, setDone, replaceTask        |
-| `src/api/tasks.test.ts`               | 26    | **Day 13.** every API function: ok, 404, 500 (body cancelled), server off, 8 s timeout, non-JSON, bad items skipped, duplicate ids, extra fields dropped, PATCH body = only the changes, caller abort |
-| `src/components/TaskForm.test.tsx`    | 24    | labels, submit prevented, trimming, required title, counters, emoji, paste not cut, 100/500 limits, invalid and half-typed dates, warnings, double click, edit mode, Escape                           |
-| `src/App.save.test.tsx`               | 20    | **Day 13.** "Saving…", failed add/edit keep the text, PATCH only changed fields, optimistic done/delete + rollback, Undo with the same id, 404 from another tab, double clicks                        |
-| `src/utils/dates.test.ts`             | 17    | formatting, null, invalid dates, leap years, local today, addDays, overdue / today with a fake today                                                                                                  |
-| `scripts/seed.test.mjs`               | 14    | **Day 13** (was `sampleTasks.test.ts`, 15). The seed: 6 to 8 tasks, unique ids, valid dates, edge cases present, one due today + one overdue for 8 "todays", local date, broken seed                  |
-| `src/App.load.test.tsx`               | 14    | **Day 13.** loading → ready, error → Try again, empty list, StrictMode double effect, abort on unmount, 8 s timeout, non-JSON, bad items warning, reload keeps changes                                |
-| `src/App.edit.test.tsx`               | 13    | prefilled form, focus, Save, Escape/Cancel, empty title blocked, one edit at a time, unsaved-changes bar (Save / Discard / invalid), no `window.confirm`                                              |
-| `src/App.delete.test.tsx`             | 12    | delete + announce, focus next/previous/heading, empty state, Undo position, 5 s timer, pause on hover and focus, latest only, selected/edited task, no timer leak                                     |
-| `src/components/TaskItem.test.tsx`    | 12    | text status/priority, overdue, due today, aria-pressed + dir, keyboard, Edit/Delete/checkbox names, row layout (no control inside another)                                                            |
-| `src/App.test.tsx`                    | 10    | empty list, sort order, toggle + aria-pressed, hidden note + Show them, all hidden, select / deselect, stale detail cleared, keyboard                                                                 |
-| `src/App.add.test.tsx`                | 7     | add + trim + focus + announce, Enter, spaces-only title, double click, empty state goes away, duplicate allowed, header note                                                                          |
-| `src/App.done.test.tsx`               | 7     | summary live, Space, sort after tick, hide done + tick, focus, lost update (edit + tick + Save stays done), edited task hidden keeps its draft                                                        |
-| `src/components/TaskDetail.test.tsx`  | 4     | null message, "No description" (empty and spaces only), full detail with line breaks                                                                                                                  |
-| `src/components/TaskSummary.test.tsx` | 4     | 0 tasks, 1 of 1, some done, all done                                                                                                                                                                  |
-| `src/keys.test.tsx`                   | 3     | the keys demo (see "Why keys matter")                                                                                                                                                                 |
-| `src/utils/scroll.test.ts`            | 3     | smooth scroll, reduced motion, no scroll on wide screens                                                                                                                                              |
-| `src/utils/plural.test.ts`            | 2     | 0 / 1 / 2 and a custom plural                                                                                                                                                                         |
+| File                                  | Tests | What it checks                                                                                                                                                                           |
+| ------------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/utils/tasks.test.ts`             | 33    | sorting, summary and "Showing X of Y" texts, addTask, updateTask, deleteTask, restoreTask, setDone (frozen arrays), validateTask, countChars, makeId                                     |
+| `src/api/tasks.test.ts`               | 26    | every API function: ok, 404, 500 (body cancelled), server off, 8 s timeout, non-JSON, bad items skipped, duplicate ids, PATCH body, caller abort                                         |
+| `src/components/TaskForm.test.tsx`    | 24    | labels, trimming, required title, counters, emoji, 100/500 limits, invalid and half-typed dates, warnings, double click, edit mode, Escape                                               |
+| `src/App.save.test.tsx`               | 20    | "Saving…", failed add/edit keep the text, PATCH only changed fields, optimistic done/delete + rollback, Undo with the same id, 404, double clicks                                        |
+| `src/utils/filters.test.ts`           | 20    | **Day 14.** URL reading (case, unknown, empty, repeats, 100 chars, emoji not split), writing (defaults left out), round trip, spaces/case/Urdu, `c++` `(` `.*` `[` as plain text, counts |
+| `src/App.routes.test.tsx`             | 19    | **Day 14.** the three routes, tab titles, `<h1>` focus, loading vs not found, load error, odd ids, trailing slash, done/delete/404 on the task page                                      |
+| `src/utils/dates.test.ts`             | 17    | formatting, null, invalid dates, leap years, local today, addDays, overdue / today with a fake today                                                                                     |
+| `src/App.filters.test.tsx`            | 15    | **Day 14.** counts + aria-pressed, priority, search, Urdu, push vs replace history, bad URL, Clear filters focus, every hidden-by-filter message, Show all, Back to tasks                |
+| `scripts/seed.test.mjs`               | 14    | the seed: 6 to 8 tasks, unique ids, valid dates, edge cases present, local date, broken seed                                                                                             |
+| `src/App.edit.test.tsx`               | 14    | the task page's form: prefilled, focus, Save, Escape/Cancel, empty title blocked, unsaved-changes bar on in-app links, no `window.confirm`                                               |
+| `src/App.load.test.tsx`               | 14    | loading → ready, error → Try again, empty list, StrictMode double effect, abort on unmount, timeout, non-JSON, bad items warning                                                         |
+| `src/components/TaskItem.test.tsx`    | 13    | text status/priority, overdue, due today, link + Edit link, dir, Edit/Delete/checkbox names, row layout                                                                                  |
+| `src/App.delete.test.tsx`             | 12    | delete + announce, focus next/previous/heading, Undo position, 5 s timer, pause on hover and focus, latest only, Delete on the task page, no timer leak                                  |
+| `src/App.add.test.tsx`                | 7     | add + trim + focus + announce, Enter, spaces-only title, double click, empty state goes away, duplicate allowed, header note                                                             |
+| `src/App.done.test.tsx`               | 6     | summary live, Space, sort after tick, ticked under "Pending" leaves with a message + focus, last one → heading, lost update                                                              |
+| `src/utils/pageTitle.test.ts`         | 5     | **Day 14.** "Tasks", task titles, the 50-character cut with "…"                                                                                                                          |
+| `src/App.test.tsx`                    | 4     | empty list, sort order, each task is a link, keyboard Tab + Enter                                                                                                                        |
+| `src/components/TaskSummary.test.tsx` | 4     | 0 tasks, 1 of 1, some done, all done                                                                                                                                                     |
+| `src/components/TaskDetail.test.tsx`  | 3     | "No description" (empty and spaces only), full detail with line breaks                                                                                                                   |
+| `src/keys.test.tsx`                   | 2     | the keys demo (see "Why keys matter")                                                                                                                                                    |
+| `src/context/TasksContext.test.tsx`   | 2     | **Day 14.** one shared load for all pages; a clear error outside the provider                                                                                                            |
+| `src/utils/plural.test.ts`            | 2     | 0 / 1 / 2 and a custom plural                                                                                                                                                            |
 
 Every date test uses a fake today (`2026-11-10`), so the tests never depend on the real date. The
 Undo tests use Vitest fake timers (see "What broke").
+
+**Old tests I changed on Day 14** (the side panel became a page, the toggle became filters):
+
+- `App.test`: "detail panel / deselect", "selection moves", "filter clears the detail" became "each
+  task is a link that opens its page"; Tab + Enter now opens the page. The four "Hide done tasks"
+  tests (toggle + aria-pressed, "N hidden" + Show them, singular, all hidden) were replaced by
+  `App.filters.test.tsx`. The keyboard test presses Tab 5 more times (3 status buttons, the
+  priority select, the search box).
+- `App.edit.test`: editing moved from the side panel to the task page; the unsaved-changes bar is
+  now triggered by in-app links ("Back to tasks"), not by selecting another task. "Only one task
+  edited at a time" and "Edit on another task asks" were removed (one page = one task).
+- `App.save.test`: edit tests run on `/tasks/:id`; a 404 on save now returns to the list. "Edit and
+  Delete do nothing while saving" became "Delete does nothing while saving".
+- `App.done.test`: "lost update" now runs on the task page. "Tick the edited task while done tasks
+  are hidden" was removed (the filter and the form are on different pages). "Hide done + tick" became
+  "with Pending on, a ticked task leaves the list and the message says why"; "hiding the last
+  not-done task" became "hiding the last visible task" (focus to the heading, "No tasks match").
+- `App.delete.test`: "deleting the selected/edited task clears the panel" became "Delete on the task
+  page goes to the list with Undo" and "deleting while editing drops the draft".
+- `App.add.test`: checks "No description" on the task page instead of the panel; "Showing 1 task"
+  became "Showing 1 of 1 task".
+- `utils/tasks.test`: the two `getVisibleTasks` tests moved to `filters.test.ts` (as `filterTasks`);
+  `getListStatusText` now checks "Showing X of Y" instead of the all-hidden texts.
+- `keys.test`: "edit B, delete A above it" was removed (the list and the form are no longer on the
+  same page); the `key={index}` / `key={id}` demo stays.
+- `TaskItem.test`: the select button (aria-pressed) is now a link; Edit is a link.
+- `TaskDetail.test`: the "Select a task" message was removed; the title is the page `<h1>`.
+- `scroll.test` (3 tests) was removed with the scroll helper.
 
 **Old tests I changed on Day 13** (the data now comes from a server):
 
@@ -462,16 +604,39 @@ Undo tests use Vitest fake timers (see "What broke").
 
 **Do the tests really catch bugs?** I broke the code on purpose and put it back each time:
 
-| What I broke                                                      | Tests that failed          |
-| ----------------------------------------------------------------- | -------------------------- |
-| `toggleDone` changes the old task object                          | 1                          |
-| The double-click guard switched off                               | 1                          |
-| The unsaved-changes check switched off                            | 5                          |
-| The Undo timer never pauses                                       | 2                          |
-| The Undo timer is not cleared (no `clearTimeout`)                 | 4                          |
-| Save writes back a copy taken when Edit was clicked (lost update) | 2                          |
-| The edit form gets a fixed key instead of `key={task.id}`         | 2                          |
-| **Day 13:** the one-request-per-task guard on "done" switched off | 1 (2 PATCHes instead of 1) |
+| What I broke                                                      | Tests that failed                |
+| ----------------------------------------------------------------- | -------------------------------- |
+| `toggleDone` changes the old task object                          | 1                                |
+| The double-click guard switched off                               | 1                                |
+| The unsaved-changes check switched off                            | 5                                |
+| The Undo timer never pauses                                       | 2                                |
+| The Undo timer is not cleared (no `clearTimeout`)                 | 4                                |
+| Save writes back a copy taken when Edit was clicked (lost update) | 2                                |
+| The edit form gets a fixed key instead of `key={task.id}`         | 2                                |
+| **Day 13:** the one-request-per-task guard on "done" switched off | 1 (2 PATCHes instead of 1)       |
+| **Day 14:** the search built with `new RegExp(needle)`            | 2 ("Nothing to repeat" on `c++`) |
+
+## What broke on Day 14
+
+Real problems and surprises from Day 14:
+
+1. **My laptop died in the middle of Part B.** Part A was committed; Part B was only in the working
+   tree. Nothing was lost: I checked `git status` and `git diff`, read every changed file, found
+   nothing half-written, and continued from there.
+2. **A test found the same message twice.** "Task marked done, but hidden by your filters." is on
+   the page **and** in the hidden live region, so `getByText` failed with "Found multiple
+   elements". The app was right; the test now looks for the message in the visible note.
+3. **Two selects were called "Priority".** My first filter test failed with "Found multiple
+   elements with the role combobox and name Priority": the filter and the add form's field had the
+   same label. A screen reader user would hear the same. The filter is now "Filter by priority".
+4. **oxlint failed on the test helper** (`only-export-components`): I had put the small
+   `LocationProbe` component inside `renderApp.tsx`, next to plain functions. It has its own file now.
+5. **A "hidden by your filters" message could stay wrong.** While reviewing the code I saw that
+   the message was only cleared by the next task action, not by a filter change: add a task under
+   "Done", click "Pending", and the visible task was still called hidden. Changing a filter now
+   removes the message; a test does exactly those steps.
+6. **I broke the search on purpose** with `new RegExp(needle)`: 2 tests failed with "Invalid
+   regular expression: /c++/: Nothing to repeat". Then I put the plain `includes` back.
 
 ## What broke on Day 13
 

@@ -3,32 +3,21 @@ import { TaskItem } from './TaskItem';
 
 type TaskListProps = {
   tasks: readonly Task[];
-  selectedId: string | null;
-  editingId: string | null;
   /** Tasks with a request running (see TaskItem's `busy`). */
   busyIds: ReadonlySet<string>;
-  onSelect: (id: string) => void;
-  onEdit: (id: string) => void;
   onDelete: (id: string) => void;
   onToggleDone: (id: string) => void;
   /** The user's local date, "YYYY-MM-DD". */
   today: string;
 };
 
-export function TaskList({ tasks, selectedId, editingId, busyIds, ...handlers }: TaskListProps) {
+export function TaskList({ tasks, busyIds, ...handlers }: TaskListProps) {
   return (
     <ul className="task-list">
       {tasks.map((task) => (
         // key = the task's id, never the array index: the order changes when we sort, filter,
         // add and delete, and React must keep each row's DOM and focus with the right task.
-        <TaskItem
-          key={task.id}
-          task={task}
-          isSelected={task.id === selectedId}
-          isEditing={task.id === editingId}
-          busy={busyIds.has(task.id)}
-          {...handlers}
-        />
+        <TaskItem key={task.id} task={task} busy={busyIds.has(task.id)} {...handlers} />
       ))}
     </ul>
   );

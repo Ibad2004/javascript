@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router';
 import './index.css';
 import { App } from './App.tsx';
 import { toLocalDateString } from './utils/dates.ts';
@@ -15,6 +16,8 @@ const today = toLocalDateString(new Date());
 
 createRoot(rootElement).render(
   <StrictMode>
-    <App today={today} />
+    <BrowserRouter>
+      <App today={today} />
+    </BrowserRouter>
   </StrictMode>,
 );

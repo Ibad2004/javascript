@@ -1,44 +1,32 @@
+import { Link } from 'react-router';
 import type { Task } from '../types';
 import { getDueLabel, getDueStatus } from '../utils/dates';
 import { focusIds } from '../utils/focusIds';
+import { taskPath } from '../utils/pageTitle';
 import { PRIORITY_LABELS } from '../utils/tasks';
 
 type TaskItemProps = {
   task: Task;
-  isSelected: boolean;
-  isEditing: boolean;
-  onSelect: (id: string) => void;
-  onEdit: (id: string) => void;
   onToggleDone: (id: string) => void;
-  /** No confirm dialog: App shows an Undo bar instead. */
+  /** No confirm dialog: the list shows an Undo bar instead. */
   onDelete: (id: string) => void;
   /** The user's local date, "YYYY-MM-DD". */
   today: string;
   /**
-   * A request for this task is running. Its checkbox, Edit and Delete are disabled until it
+   * A request for this task is running. Its checkbox and Delete are disabled until it
    * ends, so two requests for one task never overlap. aria-disabled (not `disabled`) keeps
-   * keyboard focus on the control; App ignores the click while the task is busy.
+   * keyboard focus on the control; the hook ignores the click while the task is busy.
    */
   busy?: boolean;
 };
 
 /**
- * One row: [checkbox] [select button with title and info] [Edit] [Delete].
- * The buttons sit SIDE BY SIDE, never inside each other:
- * a button inside a <button> is invalid HTML.
+ * One row: [checkbox] [link to the task's page] [Edit] [Delete].
+ * The title is a real <Link> (an <a href>), so a middle click or "open in new tab" works.
  */
-export function TaskItem({
-  task,
-  isSelected,
-  isEditing,
-  onSelect,
-  onEdit,
-  onToggleDone,
-  onDelete,
-  today,
-  busy = false,
-}: TaskItemProps) {
+export function TaskItem({ task, onToggleDone, onDelete, today, busy = false }: TaskItemProps) {
   const dueStatus = getDueStatus(task, today);
+  const path = taskPath(task.id);
 
   return (
     <li className={`task-item${task.done ? ' is-done' : ''}`} aria-busy={busy}>
@@ -53,13 +41,10 @@ export function TaskItem({
         />
         <span className="visually-hidden">Mark {task.title} as done</span>
       </label>
-      {/* A real <button>: Tab reaches it, Enter and Space select it. */}
-      <button
-        type="button"
-        id={focusIds.select(task.id)}
+      <Link
+        to={path}
+        id={focusIds.link(task.id)}
         className={`task-button priority-${task.priority}`}
-        aria-pressed={isSelected}
-        onClick={() => onSelect(task.id)}
       >
         <span className="task-title" dir="auto">
           {task.title}
@@ -69,21 +54,20 @@ export function TaskItem({
           <span>{task.done ? 'Done' : 'Not done'}</span>
           <span>Priority: {PRIORITY_LABELS[task.priority]}</span>
           <span className={`due due-${dueStatus}`}>{getDueLabel(task, today)}</span>
-          {isEditing && <span className="editing-tag">Editing</span>}
           {busy && <span className="saving-tag">Saving…</span>}
         </span>
-      </button>
+      </Link>
       <div className="task-actions">
-        {/* The title is in the accessible name, so "Edit" buttons are told apart in a list of links/buttons. */}
-        <button
-          type="button"
+        {/* Opens the task's page with the edit form already open. */}
+        <Link
+          to={path}
+          state={{ edit: true }}
           id={focusIds.edit(task.id)}
+          className="action-link"
           aria-label={`Edit ${task.title}`}
-          aria-disabled={busy}
-          onClick={() => onEdit(task.id)}
         >
           Edit
-        </button>
+        </Link>
         <button
           type="button"
           id={focusIds.remove(task.id)}

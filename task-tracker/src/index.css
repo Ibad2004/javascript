@@ -55,33 +55,12 @@ button:disabled {
   margin-top: 0;
 }
 
-.layout {
-  display: grid;
-  gap: 1rem;
-}
-
-/* Grid children may shrink below their content, so long text cannot push the page wider. */
-.layout > * {
-  min-width: 0;
-}
-
-@media (min-width: 48rem) {
-  .layout {
-    grid-template-columns: 3fr 2fr;
-    align-items: start;
-  }
-}
-
 .panel {
   background: #fff;
   border: 1px solid #d1d5db;
   border-radius: 0.5rem;
   padding: 1rem;
   margin-bottom: 1rem;
-}
-
-.detail-column {
-  scroll-margin-top: 1rem;
 }
 
 .summary {
@@ -137,6 +116,7 @@ button:disabled {
 /* The select button takes the free space. min-width 0 lets long titles wrap instead of overflowing. */
 .task-button {
   display: block;
+  text-decoration: none;
   flex: 1 1 12rem;
   min-width: 0;
   text-align: start;
@@ -163,13 +143,6 @@ button:disabled {
 
 .priority-low {
   border-inline-start-color: #6b7280;
-}
-
-/* Selected: thick outline + background, not colour alone. */
-.task-button[aria-pressed='true'] {
-  background: #dbeafe;
-  border-color: #1d4ed8;
-  box-shadow: 0 0 0 2px #1d4ed8;
 }
 
 .task-item.is-done .task-title {
@@ -206,7 +179,9 @@ button:disabled {
   margin-inline-start: auto;
 }
 
-.task-actions button {
+.task-actions button,
+.task-actions .action-link,
+.detail-actions button {
   padding: 0.375rem 0.625rem;
   border: 1px solid #9ca3af;
   border-radius: 0.375rem;
@@ -214,18 +189,16 @@ button:disabled {
   color: inherit;
 }
 
-.task-actions button:hover {
+.task-actions button:hover,
+.task-actions .action-link:hover,
+.detail-actions button:hover {
   background: #f3f4f6;
 }
 
-.task-actions .delete-button {
+.task-actions .delete-button,
+.detail-actions .delete-button {
   color: #b91c1c;
   border-color: #b91c1c;
-}
-
-.editing-tag {
-  font-weight: 600;
-  color: #1d4ed8;
 }
 
 .task-meta {
@@ -245,7 +218,7 @@ button:disabled {
   font-weight: 600;
 }
 
-.task-detail dl {
+dl.task-detail {
   margin: 0;
 }
 
@@ -459,4 +432,36 @@ button:disabled {
 button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+/* The app name is not a heading: each page has its own <h1>. */
+.app-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+}
+
+.task-actions .action-link {
+  text-decoration: none;
+}
+
+.back-link {
+  margin: 0 0 0.75rem;
+}
+
+/* Long titles without spaces must wrap, not widen the page. */
+.page-title {
+  overflow-wrap: anywhere;
+}
+
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.detail-actions .detail-done {
+  margin-inline-end: auto;
 }

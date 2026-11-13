@@ -1,12 +1,14 @@
 /**
- * The ids of the elements App moves focus to after add, edit and delete.
- * TaskItem uses the same functions, so the two can never disagree.
+ * The ids of the elements the app moves focus to after navigation, add, edit and delete.
+ * TaskItem and the pages use the same functions, so they can never disagree.
  */
 export const focusIds = {
-  select: (taskId: string) => `task-${taskId}-select`,
+  link: (taskId: string) => `task-${taskId}-link`,
   edit: (taskId: string) => `task-${taskId}-edit`,
   done: (taskId: string) => `task-${taskId}-done`,
   remove: (taskId: string) => `task-${taskId}-delete`,
-  listHeading: 'tasks-heading',
+  /** Every page has exactly one <h1> with this id. */
+  pageHeading: 'page-heading',
   unsavedBar: 'unsaved-bar',
+  detailEdit: 'detail-edit',
 };

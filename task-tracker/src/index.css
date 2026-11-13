@@ -465,3 +465,32 @@ button:disabled {
 .detail-actions .detail-done {
   margin-inline-end: auto;
 }
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.status-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.filter-field input {
+  max-width: 100%;
+}
+
+.no-match {
+  font-weight: 600;
+}

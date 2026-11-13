@@ -1,18 +1,28 @@
-import { useState } from 'react';
-import { HiddenTasksNote } from '../components/HiddenTasksNote';
+import { useSearchParams } from 'react-router';
 import { Notice } from '../components/Notice';
+import { TaskFilters } from '../components/TaskFilters';
 import { TaskForm } from '../components/TaskForm';
 import { TaskList } from '../components/TaskList';
 import { TaskSummary } from '../components/TaskSummary';
 import { UndoBar } from '../components/UndoBar';
 import { useTasksContext } from '../context/TasksContext';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import type { Task, TaskInput } from '../types';
+import {
+  DEFAULT_FILTERS,
+  countByStatus,
+  filterTasks,
+  matchesFilters,
+  readFilters,
+  writeFilters,
+  type Filters,
+} from '../utils/filters';
 import { focusIds } from '../utils/focusIds';
 import { pageTitle } from '../utils/pageTitle';
 import { pluralize } from '../utils/plural';
-import { countDone, getListStatusText, getVisibleTasks } from '../utils/tasks';
+import { getListStatusText } from '../utils/tasks';
 
-/** "/": the summary, the list and the add form. */
+/** "/": the summary, the filters, the list and the add form. */
 export function TaskListPage({ today }: { today: string }) {
   const {
     loadState,
@@ -22,18 +32,44 @@ export function TaskListPage({ today }: { today: string }) {
     busyIds,
     lastDeleted,
     clearLastDeleted,
+    filterNotice,
+    dismissFilterNotice,
+    requestFocus,
     addTask,
     removeTask,
     undoDelete,
     toggleDone,
   } = useTasksContext();
-  const [hideDone, setHideDone] = useState(false);
+  // The filters live in the URL (?status=done&priority=high&q=milk): reload, Back/Forward
+  // and shared links keep them. The URL is the ONLY copy; nothing is mirrored in state.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filters = readFilters(searchParams);
   useDocumentTitle(pageTitle());
 
-  // Derived on every render; nothing is stored twice.
-  const visibleTasks = getVisibleTasks(tasks, hideDone);
-  const hiddenCount = hideDone ? countDone(tasks) : 0;
+  // Calculated during render: no effect, no filtered copy in state.
+  const visibleTasks = filterTasks(tasks, filters);
+  const counts = countByStatus(tasks);
   const isReady = loadState.status === 'ready';
+  const noMatch = tasks.length > 0 && visibleTasks.length === 0;
+  const isHidden = (task: Task) => !matchesFilters(task, filters);
+
+  /** Status and priority push a history entry (Back undoes them); typing replaces it. */
+  function setFilters(next: Filters, { replace = false } = {}) {
+    setSearchParams(writeFilters(next), { replace });
+  }
+
+  function clearFilters() {
+    setFilters(DEFAULT_FILTERS);
+    dismissFilterNotice();
+    requestFocus(focusIds.search);
+  }
+
+  function showAll(taskId: string) {
+    setFilters(DEFAULT_FILTERS);
+    dismissFilterNotice();
+    // The button disappears with the message; focus goes to the task it was about.
+    requestFocus(focusIds.link(taskId));
+  }
 
   /** Where focus goes when `id` leaves the visible list: the next task, else the previous one. */
   function neighbourFocusId(id: string): string {
@@ -44,15 +80,15 @@ export function TaskListPage({ today }: { today: string }) {
 
   function handleToggleDone(id: string) {
     // Read before the update: once hidden, the task is no longer in visibleTasks.
-    void toggleDone(id, hideDone ? { hiddenFocusId: neighbourFocusId(id) } : {});
+    void toggleDone(id, { hiddenBy: isHidden, hiddenFocusId: neighbourFocusId(id) });
   }
 
   function handleDelete(id: string) {
     void removeTask(id, { focusId: neighbourFocusId(id) });
   }
 
-  function toggleHideDone() {
-    setHideDone((h) => !h);
+  function handleAdd(input: TaskInput) {
+    return addTask(input, { hiddenBy: isHidden });
   }
 
   return (
@@ -85,28 +121,44 @@ export function TaskListPage({ today }: { today: string }) {
               </p>
             )}
             <Notice />
-            <button
-              type="button"
-              className="toggle-button"
-              aria-pressed={hideDone}
-              onClick={toggleHideDone}
-            >
-              {hideDone ? 'Show done tasks' : 'Hide done tasks'}
-            </button>
+            <TaskFilters
+              filters={filters}
+              counts={counts}
+              onStatusChange={(status) => setFilters({ ...filters, status })}
+              onPriorityChange={(priority) => setFilters({ ...filters, priority })}
+              onSearchChange={(q) => setFilters({ ...filters, q }, { replace: true })}
+            />
             <p role="status" className="list-status">
               {getListStatusText(tasks.length, visibleTasks.length)}
             </p>
+            {filterNotice !== null && (
+              <p className="hidden-note">
+                {filterNotice.text}{' '}
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() => showAll(filterNotice.taskId)}
+                >
+                  Show all
+                </button>
+              </p>
+            )}
             {lastDeleted !== null && (
               <UndoBar
                 key={lastDeleted.task.id}
                 message="Task deleted."
-                onUndo={() => void undoDelete()}
+                onUndo={() => void undoDelete({ hiddenBy: isHidden })}
                 onTimeout={clearLastDeleted}
                 busy={busyIds.has(lastDeleted.task.id)}
               />
             )}
-            {hiddenCount > 0 && (
-              <HiddenTasksNote hiddenCount={hiddenCount} onShow={toggleHideDone} />
+            {noMatch && (
+              <p className="no-match">
+                No tasks match these filters.{' '}
+                <button type="button" className="link-button" onClick={clearFilters}>
+                  Clear filters
+                </button>
+              </p>
             )}
             {visibleTasks.length > 0 && (
               <TaskList
@@ -126,7 +178,7 @@ export function TaskListPage({ today }: { today: string }) {
           <h2 id="form-heading">Add a task</h2>
           <TaskForm
             submitLabel="Add task"
-            onSubmit={addTask}
+            onSubmit={handleAdd}
             tasks={tasks}
             today={today}
             clearOnSubmit

@@ -29,13 +29,22 @@ export type LoadState =
 /** Called when the server says the task is gone (deleted in another tab). */
 type OnMissing = { onMissing?: () => void };
 
-export type ToggleDoneOptions = OnMissing & {
-  /**
-   * Given when "Hide done tasks" is on: if the task becomes done it leaves the list,
-   * so focus moves to this element (its neighbour, or the page heading).
-   */
-  hiddenFocusId?: string;
-};
+/**
+ * The list page's filters. true = this task (as it is AFTER the change) is hidden by them:
+ * the message then says so ("…, but hidden by your filters.") and offers "Show all".
+ */
+export type HiddenBy = { hiddenBy?: (task: Task) => boolean };
+
+export type ToggleDoneOptions = OnMissing &
+  HiddenBy & {
+    /** If the task leaves the filtered list, focus moves here (its neighbour, or the heading). */
+    hiddenFocusId?: string;
+  };
+
+/** "Task added, but hidden by your filters." — shown with a [Show all] button. */
+export type FilterNotice = { text: string; taskId: string };
+
+export const HIDDEN_SUFFIX = ', but hidden by your filters.';
 
 export type DeleteOptions = OnMissing & {
   /** Where focus goes once the task is gone (the Delete button that had it disappears). */
@@ -67,6 +76,8 @@ export function useTasks({ makeId = defaultMakeId }: UseTasksOptions = {}) {
   const [busyIds, setBusyIds] = useState<ReadonlySet<string>>(() => new Set());
   // The last failed save, shown at the top of the page until dismissed or the next action.
   const [notice, setNotice] = useState<string | null>(null);
+  // A task the user just changed is hidden by the list's filters. Cleared like `notice`.
+  const [filterNotice, setFilterNotice] = useState<FilterNotice | null>(null);
   const [announcement, setAnnouncement] = useState<Announcement>({ text: '', id: 0 });
   // A new object every time, so asking twice for the same element still re-renders and focuses.
   const [focusRequest, setFocusRequest] = useState<{ elementId: string } | null>(null);
@@ -128,6 +139,30 @@ export function useTasks({ makeId = defaultMakeId }: UseTasksOptions = {}) {
     setNotice(null);
   }
 
+  function dismissFilterNotice() {
+    setFilterNotice(null);
+  }
+
+  /** Every new action starts with a clean slate: old messages would be about something else. */
+  function clearMessages() {
+    setNotice(null);
+    setFilterNotice(null);
+  }
+
+  /**
+   * Announces `text`. If the filters hide the task, the message says so on the page too,
+   * so the user is never left wondering where the task went.
+   */
+  function announceResult(text: string, task: Task, hiddenBy?: (task: Task) => boolean) {
+    if (hiddenBy?.(task) === true) {
+      const message = `${text}${HIDDEN_SUFFIX}`;
+      setFilterNotice({ text: message, taskId: task.id });
+      announce(message);
+    } else {
+      announce(text);
+    }
+  }
+
   function clearLastDeleted() {
     setLastDeleted(null);
   }
@@ -160,14 +195,14 @@ export function useTasks({ makeId = defaultMakeId }: UseTasksOptions = {}) {
   }
 
   /** Waits for the server. Returns an error message for the form, or null when saved. */
-  async function addTask(input: TaskInput): Promise<string | null> {
-    setNotice(null);
+  async function addTask(input: TaskInput, { hiddenBy }: HiddenBy = {}): Promise<string | null> {
+    clearMessages();
     // The id is made here, in the event handler: the same id is used by the server and by Undo.
     const newTask: Task = { id: makeId(), ...input, done: false };
     try {
       const saved = await createTask(newTask);
       setTasks((old) => [...old, saved]);
-      announce('Task added');
+      announceResult('Task added', saved, hiddenBy);
       return null;
     } catch (error) {
       const message = `Couldn't add the task. ${toUserMessage(error)}`;
@@ -191,7 +226,7 @@ export function useTasks({ makeId = defaultMakeId }: UseTasksOptions = {}) {
 
     if (Object.keys(changes).length > 0) {
       if (!lockTask(id)) return 'This task is still saving. Try again in a moment.';
-      setNotice(null);
+      clearMessages();
       try {
         // PATCH, not PUT: the server merges these fields into ITS current task, so a
         // "done" ticked while the form was open stays done (no lost update).
@@ -220,7 +255,7 @@ export function useTasks({ makeId = defaultMakeId }: UseTasksOptions = {}) {
     const task = tasks[index];
     if (task === undefined || !lockTask(id)) return;
 
-    setNotice(null);
+    clearMessages();
     setTasks((old) => deleteTask(old, id));
     setLastDeleted({ task, index });
     announce('Task deleted');
@@ -242,16 +277,16 @@ export function useTasks({ makeId = defaultMakeId }: UseTasksOptions = {}) {
   }
 
   /** Undo = create the task again on the server, with the SAME id. */
-  async function undoDelete() {
+  async function undoDelete({ hiddenBy }: HiddenBy = {}) {
     if (lastDeleted === null) return;
     const { task, index } = lastDeleted;
     // While the DELETE is still running, Undo waits (the button shows as disabled).
     if (!lockTask(task.id)) return;
-    setNotice(null);
+    clearMessages();
     setTasks((old) => restoreTask(old, task, index));
     setLastDeleted(null);
-    announce('Task restored');
-    // If "Hide done tasks" hides it, the effect falls back to the page heading.
+    announceResult('Task restored', task, hiddenBy);
+    // If the filters hide it, the effect falls back to the page heading.
     requestFocus(focusIds.link(task.id));
 
     try {
@@ -261,6 +296,7 @@ export function useTasks({ makeId = defaultMakeId }: UseTasksOptions = {}) {
       setTasks((old) => deleteTask(old, task.id));
       // The Undo bar comes back, so the user can try again.
       setLastDeleted({ task, index });
+      setFilterNotice(null);
       showError(`Couldn't restore the task. ${toUserMessage(error)}`);
       requestFocus(focusIds.pageHeading);
     } finally {
@@ -269,21 +305,20 @@ export function useTasks({ makeId = defaultMakeId }: UseTasksOptions = {}) {
   }
 
   /** Optimistic: the tick shows at once; if the server says no, it goes back. */
-  async function toggleDone(id: string, { hiddenFocusId, onMissing }: ToggleDoneOptions = {}) {
+  async function toggleDone(
+    id: string,
+    { hiddenBy, hiddenFocusId, onMissing }: ToggleDoneOptions = {},
+  ) {
     const task = tasks.find((t) => t.id === id);
     if (task === undefined || !lockTask(id)) return;
     const nowDone = !task.done;
-    const willHide = nowDone && hiddenFocusId !== undefined;
+    const changed: Task = { ...task, done: nowDone };
 
-    setNotice(null);
+    clearMessages();
     setTasks((old) => setDone(old, id, nowDone));
-    if (willHide) {
-      announce('Task marked done (hidden)');
-      // The checkbox that had focus disappears with its row.
-      requestFocus(hiddenFocusId);
-    } else {
-      announce(nowDone ? 'Task marked done' : 'Task marked not done');
-    }
+    announceResult(nowDone ? 'Task marked done' : 'Task marked not done', changed, hiddenBy);
+    // The checkbox that had focus disappears with its row.
+    if (hiddenBy?.(changed) === true && hiddenFocusId !== undefined) requestFocus(hiddenFocusId);
 
     try {
       const saved = await updateTaskOnServer(id, { done: nowDone });
@@ -293,6 +328,7 @@ export function useTasks({ makeId = defaultMakeId }: UseTasksOptions = {}) {
         removeMissingTask(id, onMissing);
       } else {
         setTasks((old) => setDone(old, id, task.done));
+        setFilterNotice(null);
         showError(`Couldn't save the change. The task is back as it was. ${toUserMessage(error)}`);
       }
     } finally {
@@ -309,6 +345,8 @@ export function useTasks({ makeId = defaultMakeId }: UseTasksOptions = {}) {
     isBusy,
     notice,
     dismissNotice,
+    filterNotice,
+    dismissFilterNotice,
     announcement,
     announce,
     requestFocus,

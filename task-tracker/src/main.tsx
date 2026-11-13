@@ -16,7 +16,8 @@ const today = toLocalDateString(new Date());
 
 createRoot(rootElement).render(
   <StrictMode>
-    <BrowserRouter>
+    {/* No transitions: the search box is controlled by the URL and must update at once. */}
+    <BrowserRouter useTransitions={false}>
       <App today={today} />
     </BrowserRouter>
   </StrictMode>,

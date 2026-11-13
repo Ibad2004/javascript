@@ -9,12 +9,24 @@ import { useTasksContext } from '../context/TasksContext';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import type { TaskInput } from '../types';
 import { focusIds } from '../utils/focusIds';
+import { filtersToSearch, readFilters } from '../utils/filters';
 import { pageTitle } from '../utils/pageTitle';
 import { toFormValues } from '../utils/tasks';
 
 /** The list's "Edit" link sends { edit: true } so the page opens with the form open. */
 function wantsEdit(state: unknown): boolean {
   return typeof state === 'object' && state !== null && 'edit' in state && state.edit === true;
+}
+
+/**
+ * The list URL to go back to, with the filters the user came from. History state is
+ * untrusted too (any page can push it), so it goes through the same URL reader.
+ */
+function listPathFrom(state: unknown): string {
+  const raw =
+    typeof state === 'object' && state !== null && 'listSearch' in state ? state.listSearch : '';
+  const params = new URLSearchParams(typeof raw === 'string' ? raw : '');
+  return `/${filtersToSearch(readFilters(params))}`;
 }
 
 /** "/tasks/:id". key = id: another task gets a fresh page (no edit state carried over). */
@@ -44,6 +56,7 @@ function TaskDetailView({ id, today }: { id: string; today: string }) {
   // Where the user tried to go while the form had unsaved changes.
   const [pendingTo, setPendingTo] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const listPath = listPathFrom(location.state);
 
   // Never "Task not found" while loading: the task may simply not be here YET.
   const task = loadState.status === 'ready' ? (tasks.find((t) => t.id === id) ?? null) : null;
@@ -61,7 +74,7 @@ function TaskDetailView({ id, today }: { id: string; today: string }) {
   /** The task is gone (deleted here or in another tab): the list shows why. */
   function backToList() {
     // replace: Back must not return to a page for a task that no longer exists.
-    void navigate('/', { replace: true });
+    void navigate(listPath, { replace: true });
   }
 
   function stopEditing() {
@@ -128,7 +141,7 @@ function TaskDetailView({ id, today }: { id: string; today: string }) {
   return (
     <main aria-busy={loadState.status === 'loading'}>
       <p className="back-link">
-        <Link to="/" onClick={(event) => guardLink(event, '/')}>
+        <Link to={listPath} onClick={(event) => guardLink(event, listPath)}>
           <span aria-hidden="true">← </span>Back to tasks
         </Link>
       </p>

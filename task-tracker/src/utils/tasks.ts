@@ -26,12 +26,6 @@ export function sortTasks(tasks: readonly Task[]): Task[] {
   return tasks.toSorted(compareTasks);
 }
 
-/** The list the user sees: optionally without done tasks, always sorted. */
-export function getVisibleTasks(tasks: readonly Task[], hideDone: boolean): Task[] {
-  const filtered = hideDone ? tasks.filter((task) => !task.done) : tasks;
-  return sortTasks(filtered);
-}
-
 export function countDone(tasks: readonly Task[]): number {
   return tasks.filter((task) => task.done).length;
 }
@@ -43,17 +37,12 @@ export function getSummaryText(tasks: readonly Task[]): string {
 }
 
 /**
- * The line above the list. It is a live region, so screen readers
- * hear the change when the filter hides or shows tasks.
+ * The line above the list ("Showing 2 of 8 tasks"). It is a live region, so screen
+ * readers hear the change when the filters hide or show tasks.
  */
 export function getListStatusText(totalCount: number, visibleCount: number): string {
   if (totalCount === 0) return 'No tasks yet. Add your first task below.';
-  if (visibleCount === 0) {
-    return totalCount === 1
-      ? 'Your only task is done, so it is hidden.'
-      : `All ${totalCount} tasks are done, so they are all hidden.`;
-  }
-  return `Showing ${pluralize(visibleCount, 'task')}`;
+  return `Showing ${visibleCount} of ${pluralize(totalCount, 'task')}`;
 }
 
 export const PRIORITY_LABELS: Record<Priority, string> = {

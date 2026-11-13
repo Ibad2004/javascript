@@ -1,4 +1,4 @@
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import type { Task } from '../types';
 import { getDueLabel, getDueStatus } from '../utils/dates';
 import { focusIds } from '../utils/focusIds';
@@ -27,6 +27,8 @@ type TaskItemProps = {
 export function TaskItem({ task, onToggleDone, onDelete, today, busy = false }: TaskItemProps) {
   const dueStatus = getDueStatus(task, today);
   const path = taskPath(task.id);
+  // The list's filters (?status=done…) travel with the link, so "Back to tasks" keeps them.
+  const listSearch = useLocation().search;
 
   return (
     <li className={`task-item${task.done ? ' is-done' : ''}`} aria-busy={busy}>
@@ -43,6 +45,7 @@ export function TaskItem({ task, onToggleDone, onDelete, today, busy = false }: 
       </label>
       <Link
         to={path}
+        state={{ listSearch }}
         id={focusIds.link(task.id)}
         className={`task-button priority-${task.priority}`}
       >
@@ -61,7 +64,7 @@ export function TaskItem({ task, onToggleDone, onDelete, today, busy = false }: 
         {/* Opens the task's page with the edit form already open. */}
         <Link
           to={path}
-          state={{ edit: true }}
+          state={{ edit: true, listSearch }}
           id={focusIds.edit(task.id)}
           className="action-link"
           aria-label={`Edit ${task.title}`}

@@ -181,6 +181,17 @@ describe('App: filters', () => {
     expect(hiddenNote()).toBeNull();
   });
 
+  it('changing the filters removes an old "hidden" message (it could now be wrong)', async () => {
+    const { user } = await renderApp(tasks, { route: '/?status=done' });
+    await user.type(within(addForm()).getByLabelText('Title'), 'New one{Enter}');
+    expect(
+      await screen.findByText(/hidden by your filters/, { selector: '.hidden-note' }),
+    ).toBeInTheDocument();
+    await user.click(statusButton('Pending'));
+    expect(listedTitles()).toContain('New one');
+    expect(hiddenNote()).toBeNull();
+  });
+
   it('"Back to tasks" keeps the filters (from the link and from Edit)', async () => {
     const { user } = await renderApp(tasks, { route: '/?priority=high&q=milk' });
     await user.click(taskLink('Buy milk'));

@@ -56,17 +56,17 @@ export function TaskListPage({ today }: { today: string }) {
   /** Status and priority push a history entry (Back undoes them); typing replaces it. */
   function setFilters(next: Filters, { replace = false } = {}) {
     setSearchParams(writeFilters(next), { replace });
+    // "…, but hidden by your filters" was about the OLD filters: it could now be wrong.
+    dismissFilterNotice();
   }
 
   function clearFilters() {
     setFilters(DEFAULT_FILTERS);
-    dismissFilterNotice();
     requestFocus(focusIds.search);
   }
 
   function showAll(taskId: string) {
     setFilters(DEFAULT_FILTERS);
-    dismissFilterNotice();
     // The button disappears with the message; focus goes to the task it was about.
     requestFocus(focusIds.link(taskId));
   }

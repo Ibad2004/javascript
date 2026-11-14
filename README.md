@@ -29,7 +29,7 @@ day folders (for example `day-15-react-counter/`), each with its own
 ## Requirements
 
 - [Git](https://git-scm.com/)
-- [Node.js](https://nodejs.org/) 18 or newer (includes npm)
+- [Node.js](https://nodejs.org/) 18 or newer for Days 1-10 (includes npm). The React app in `task-tracker/` needs **Node 20.19 or newer** (Vite 8)
 - [VS Code](https://code.visualstudio.com/) (recommended)
 
 Check they are installed:

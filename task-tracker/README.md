@@ -1,5 +1,26 @@
 # Task Tracker
 
+**Summary:** a small task tracker built with Vite + React + TypeScript over Days 11-15. You can add, edit,
+delete and filter tasks, open a task page, and see loading and error states. Locally the tasks are saved
+on a mock server (json-server); the live demo on Vercel saves them in the browser. Needs **Node 20.19+**.
+Run `npm run check` (lint, tests, build) before a commit.
+
+**Contents:**
+[How to run](#how-to-run) ·
+[Deploy (Vercel)](#deploy-vercel) ·
+[Component tree](#component-tree) ·
+[Props, state and context](#props-state-and-context) ·
+[Day 15](#day-15-the-look-responsive-layout-accessibility-a-delete-dialog-and-the-deploy) ·
+[Day 14](#day-14-filters-a-task-page-and-a-usetasks-hook-react-router) ·
+[Demo script](#demo-script-2-minutes-on-a-phone) ·
+[Day 13](#day-13-the-tracker-reads-from-a-mock-api-json-server) ·
+[Day 12](#day-12-add-edit-delete-and-mark-done-in-memory) ·
+[Why keys matter](#why-keys-matter) ·
+[Day 11 edge cases](#day-11-edge-cases-developer-side) ·
+[Tests](#tests) ·
+[What broke](#what-broke-on-day-15) ·
+[Tech](#tech)
+
 A small task tracker built with **Vite + React + TypeScript**.
 This is a one-week project: every day I add to the **same app**.
 

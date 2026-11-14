@@ -5,8 +5,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node day-01/index.js",
-    "day": "node"
+    "start": "node day-01/index.js"
   },
   "engines": {
     "node": ">=18"

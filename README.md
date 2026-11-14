@@ -9,7 +9,7 @@ Each day gets its own folder, so progress is easy to follow from the first
 ```
 javascript/
 ├── day-01/              # One folder per day of practice
-│   ├── index.js         # The day's code
+│   ├── 01-name.js      # The day's code (numbered files)
 │   └── README.md        # Goals, how to run it, what I learned
 ├── task-tracker/        # Week 3 (Days 11 to 15): Vite + React + TypeScript app
 ├── notes/               # Reference notes (Git, JS concepts, React, ...)
@@ -60,7 +60,7 @@ npm start
 
 1. Copy the template: `cp -r templates/day-XX day-02`
    (PowerShell: `Copy-Item -Recurse templates\day-XX day-02`)
-2. Write the code in `day-02/index.js` and fill in `day-02/README.md`.
+2. Write the code in `day-02/01-topic.js` (numbered files, like `01-name.js`) and fill in `day-02/README.md`.
 3. Commit and push:
 
    ```bash
@@ -91,3 +91,5 @@ npm start
 
 Days 11 to 15 build one app, the [task tracker](task-tracker/) (Week 3). Its own README lists what
 each day adds. Days 12 to 15 are planned.
+
+Note: the earliest commits used the author name Ibad2004; it is the same person as Ibad Ur Rahman. History was not rewritten.

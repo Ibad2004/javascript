@@ -7,7 +7,7 @@
 ## Run
 
 ```bash
-node day-XX/index.js
+node day-XX/01-topic.js
 ```
 
 ## What I learned

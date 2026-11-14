@@ -1,4 +1,5 @@
 import { Route, Routes } from 'react-router';
+import type { TasksSource } from './api/source';
 import { Header } from './components/Header';
 import { LiveRegion } from './components/LiveRegion';
 import { TasksProvider, useTasksContext } from './context/TasksContext';
@@ -12,12 +13,17 @@ type AppProps = {
   today: string;
   /** Makes the id of a new task. Tests pass a fake one to get predictable ids. */
   makeId?: () => string;
+  /** Where the tasks live. Default: the source VITE_DATA_SOURCE picks. Tests pass their own. */
+  source?: TasksSource;
 };
 
 /** The router itself is outside (BrowserRouter in main.tsx, MemoryRouter in tests). */
-export function App({ today, makeId }: AppProps) {
+export function App({ today, makeId, source }: AppProps) {
   return (
-    <TasksProvider {...(makeId === undefined ? {} : { makeId })}>
+    <TasksProvider
+      {...(makeId === undefined ? {} : { makeId })}
+      {...(source === undefined ? {} : { source })}
+    >
       <AppRoutes today={today} />
     </TasksProvider>
   );

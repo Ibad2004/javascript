@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { ConfirmDeleteDialog } from '../components/ConfirmDeleteDialog';
+import { ConfirmDeleteDialog, ConfirmDialog } from '../components/ConfirmDeleteDialog';
 import { Notice } from '../components/Notice';
 import { TaskFilters } from '../components/TaskFilters';
 import { TaskForm } from '../components/TaskForm';
@@ -42,6 +42,8 @@ export function TaskListPage({ today }: { today: string }) {
     removeTask,
     undoDelete,
     toggleDone,
+    canResetDemo,
+    resetDemoData,
   } = useTasksContext();
   // The filters live in the URL (?status=done&priority=high&q=milk): reload, Back/Forward
   // and shared links keep them. The URL is the ONLY copy; nothing is mirrored in state.
@@ -51,6 +53,7 @@ export function TaskListPage({ today }: { today: string }) {
   // The task the delete dialog asks about. null = no dialog.
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const confirmDeleteTask = tasks.find((task) => task.id === confirmDeleteId) ?? null;
+  const [isConfirmingReset, setIsConfirmingReset] = useState(false);
 
   // Calculated during render: no effect, no filtered copy in state.
   const visibleTasks = filterTasks(tasks, filters);
@@ -98,6 +101,16 @@ export function TaskListPage({ today }: { today: string }) {
   function confirmDelete(id: string) {
     setConfirmDeleteId(null);
     void removeTask(id, { focusId: neighbourFocusId(id) });
+  }
+
+  function confirmReset() {
+    setIsConfirmingReset(false);
+    void resetDemoData();
+  }
+
+  function cancelReset() {
+    setIsConfirmingReset(false);
+    requestFocus(focusIds.resetDemo);
   }
 
   function cancelDelete(id: string) {
@@ -188,6 +201,18 @@ export function TaskListPage({ today }: { today: string }) {
                 today={today}
               />
             )}
+            {/* Browser storage only: json-server has npm run db:reset instead. */}
+            {canResetDemo && (
+              <p className="demo-reset">
+                <button
+                  type="button"
+                  id={focusIds.resetDemo}
+                  onClick={() => setIsConfirmingReset(true)}
+                >
+                  Reset demo data
+                </button>
+              </p>
+            )}
           </>
         )}
       </section>
@@ -203,6 +228,15 @@ export function TaskListPage({ today }: { today: string }) {
             clearOnSubmit
           />
         </section>
+      )}
+      {isConfirmingReset && (
+        <ConfirmDialog
+          question="Reset the demo data?"
+          text="All tasks in this browser are replaced by the sample tasks. This cannot be undone."
+          confirmLabel="Reset"
+          onConfirm={confirmReset}
+          onCancel={cancelReset}
+        />
       )}
       {confirmDeleteTask !== null && (
         <ConfirmDeleteDialog

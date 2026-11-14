@@ -12,5 +12,6 @@ export const focusIds = {
   unsavedBar: 'unsaved-bar',
   detailEdit: 'detail-edit',
   detailDelete: 'detail-delete',
+  resetDemo: 'reset-demo',
   search: 'task-search',
 };

@@ -1,12 +1,22 @@
 import { useEffect, useId, useRef } from 'react';
-import type { KeyboardEvent, MouseEvent, SyntheticEvent } from 'react';
+import type { KeyboardEvent, MouseEvent, ReactNode, SyntheticEvent } from 'react';
 
-type ConfirmDeleteDialogProps = {
-  /** The task's title, shown in the question. */
-  title: string;
+type Answers = {
   onConfirm: () => void;
   /** Escape, Cancel and a click on the backdrop all end here. The parent puts focus back. */
   onCancel: () => void;
+};
+
+type ConfirmDeleteDialogProps = Answers & {
+  /** The task's title, shown in the question. */
+  title: string;
+};
+
+type ConfirmDialogProps = Answers & {
+  question: ReactNode;
+  text: string;
+  /** The label of the danger button ("Delete", "Reset"). */
+  confirmLabel: string;
 };
 
 /**
@@ -18,7 +28,29 @@ type ConfirmDeleteDialogProps = {
  * The Undo bar still appears after "Delete": the dialog stops accidents, Undo is for a
  * change of mind.
  */
-export function ConfirmDeleteDialog({ title, onConfirm, onCancel }: ConfirmDeleteDialogProps) {
+export function ConfirmDeleteDialog({ title, ...answers }: ConfirmDeleteDialogProps) {
+  return (
+    <ConfirmDialog
+      question={
+        <>
+          Delete “<bdi>{title}</bdi>”?
+        </>
+      }
+      text="This can be undone for 5 seconds."
+      confirmLabel="Delete"
+      {...answers}
+    />
+  );
+}
+
+/** The same modal for any "are you sure?" (Delete, Reset demo data). Cancel is always first. */
+export function ConfirmDialog({
+  question,
+  text,
+  confirmLabel,
+  onConfirm,
+  onCancel,
+}: ConfirmDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
   // The first answer wins: a double click on Delete deletes once, and Escape after a click
@@ -73,9 +105,9 @@ export function ConfirmDeleteDialog({ title, onConfirm, onCancel }: ConfirmDelet
     >
       <div className="dialog-body">
         <h2 id={`${uid}-title`} className="dialog-title">
-          Delete “<bdi>{title}</bdi>”?
+          {question}
         </h2>
-        <p id={`${uid}-text`}>This can be undone for 5 seconds.</p>
+        <p id={`${uid}-text`}>{text}</p>
         <div className="dialog-buttons">
           <button
             ref={cancelRef}
@@ -86,7 +118,7 @@ export function ConfirmDeleteDialog({ title, onConfirm, onCancel }: ConfirmDelet
             Cancel
           </button>
           <button type="button" className="button-danger" onClick={() => answer(onConfirm)}>
-            Delete
+            {confirmLabel}
           </button>
         </div>
       </div>

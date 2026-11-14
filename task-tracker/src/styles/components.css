@@ -519,3 +519,10 @@
     transform: translateY(0.5rem);
   }
 }
+
+/* ---- Reset demo data (browser storage only) ---- */
+.demo-reset {
+  margin: var(--space-5) 0 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}

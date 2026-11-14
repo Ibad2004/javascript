@@ -155,7 +155,7 @@ export function isTask(value: unknown): value is Task {
 }
 
 /** Only the Task fields: extra properties in db.json are dropped. */
-function cleanTask(task: Task): Task {
+export function cleanTask(task: Task): Task {
   const { id, title, description, done, priority, dueDate } = task;
   return { id, title, description, done, priority, dueDate };
 }
@@ -169,7 +169,25 @@ export type LoadedTasks = {
   tasks: Task[];
   /** Items that failed the type guard (or repeated an id) and were left out. */
   skipped: number;
+  /** A message for the user about the data itself (browser storage only), e.g. it was reset. */
+  warning?: string;
 };
+
+/**
+ * Keeps the items that pass the type guard, once per id. A repeated id would break
+ * React keys and make edits hit the wrong row. Used by both data sources.
+ */
+export function readTaskList(data: readonly unknown[]): LoadedTasks {
+  const tasks: Task[] = [];
+  const seen = new Set<string>();
+  for (const item of data) {
+    if (isTask(item) && !seen.has(item.id)) {
+      seen.add(item.id);
+      tasks.push(cleanTask(item));
+    }
+  }
+  return { tasks, skipped: data.length - tasks.length };
+}
 
 function taskPath(id: string): string {
   return `/tasks/${encodeURIComponent(id)}`;
@@ -179,16 +197,7 @@ function taskPath(id: string): string {
 export async function getTasks(signal?: AbortSignal): Promise<LoadedTasks> {
   const data = await request('/tasks', { signal });
   if (!Array.isArray(data)) throw new ApiError('bad-data');
-  const tasks: Task[] = [];
-  const seen = new Set<string>();
-  for (const item of data) {
-    // A repeated id would break React keys and make edits hit the wrong row.
-    if (isTask(item) && !seen.has(item.id)) {
-      seen.add(item.id);
-      tasks.push(cleanTask(item));
-    }
-  }
-  return { tasks, skipped: data.length - tasks.length };
+  return readTaskList(data);
 }
 
 /** POST /tasks. The id is made by the app, so Undo can re-create a task with the SAME id. */

@@ -1,12 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  createTask,
-  deleteTask as deleteTaskOnServer,
-  getTasks,
-  isNotFound,
-  toUserMessage,
-  updateTask as updateTaskOnServer,
-} from '../api/tasks';
+import { defaultSource } from '../api';
+import type { TasksSource } from '../api/source';
+import { isNotFound, toUserMessage } from '../api/tasks';
 import type { Announcement } from '../components/LiveRegion';
 import type { Task, TaskInput } from '../types';
 import { focusIds } from '../utils/focusIds';
@@ -54,6 +49,11 @@ export type DeleteOptions = OnMissing & {
 type UseTasksOptions = {
   /** Makes the id of a new task. Tests pass a fake one to get predictable ids. */
   makeId?: () => string;
+  /**
+   * Where the tasks live: json-server or this browser's storage. Both have the same
+   * functions, so nothing below knows (or cares) which one it is. Chosen by VITE_DATA_SOURCE.
+   */
+  source?: TasksSource;
 };
 
 /**
@@ -61,7 +61,8 @@ type UseTasksOptions = {
  * done, delete and undo, the one-request-per-task guard, the error notice and the
  * live-region messages. Pages only decide what to show and where focus goes.
  */
-export function useTasks({ makeId = defaultMakeId }: UseTasksOptions = {}) {
+export function useTasks({ makeId = defaultMakeId, source = defaultSource }: UseTasksOptions = {}) {
+  const { createTask, updateTask: updateTaskOnServer, deleteTask: deleteTaskOnServer } = source;
   const [loadState, setLoadState] = useState<LoadState>({ status: 'loading' });
   // "Try again" adds 1: the load effect depends on it, so it runs again.
   const [loadAttempt, setLoadAttempt] = useState(0);
@@ -116,13 +117,15 @@ export function useTasks({ makeId = defaultMakeId }: UseTasksOptions = {}) {
   // appears (and on "Try again"). Clicks never use effects: saving lives in the handlers.
   useEffect(() => {
     const controller = new AbortController();
-    getTasks(controller.signal).then(
+    source.getTasks(controller.signal).then(
       (result) => {
         // After unmount (or StrictMode's dev re-run) the old request's answer is ignored.
         if (controller.signal.aborted) return;
         setTasks(result.tasks);
         setSkippedCount(result.skipped);
         setLoadState({ status: 'ready' });
+        // Browser storage only: it was blocked, or damaged and reset. Shown, never a blank page.
+        if (result.warning !== undefined) showError(result.warning);
       },
       (error: unknown) => {
         // Our own abort (AbortError) is not a failure: say nothing.
@@ -133,7 +136,43 @@ export function useTasks({ makeId = defaultMakeId }: UseTasksOptions = {}) {
       },
     );
     return () => controller.abort();
-  }, [loadAttempt]);
+  }, [loadAttempt, source]);
+
+  // Another tab changed the saved tasks, or a save could not be stored: an outside system
+  // talking to us, so an effect subscribes (and unsubscribes on unmount).
+  useEffect(
+    () =>
+      source.subscribe((event) => {
+        if (event.type === 'warning') {
+          showError(event.message);
+          return;
+        }
+        source.getTasks().then(
+          (result) => {
+            setTasks(result.tasks);
+            setSkippedCount(result.skipped);
+            announce('The list was updated in another tab');
+          },
+          () => {
+            // Keep the list we have; the next action shows any real problem.
+          },
+        );
+      }),
+    [source],
+  );
+
+  /** Browser storage only: replace everything with the sample tasks. */
+  async function resetDemoData() {
+    if (source.resetDemoData === undefined) return;
+    clearMessages();
+    const result = await source.resetDemoData();
+    setTasks(result.tasks);
+    setSkippedCount(0);
+    setLastDeleted(null);
+    announce('The demo data was reset');
+    if (result.warning !== undefined) showError(result.warning);
+    requestFocus(focusIds.pageHeading);
+  }
 
   function dismissNotice() {
     setNotice(null);
@@ -337,6 +376,10 @@ export function useTasks({ makeId = defaultMakeId }: UseTasksOptions = {}) {
   }
 
   return {
+    /** The header note: "Saved on the local mock server (json-server)" or "Saved in this browser". */
+    dataLocation: source.where,
+    canResetDemo: source.resetDemoData !== undefined,
+    resetDemoData,
     loadState,
     retryLoad,
     tasks,

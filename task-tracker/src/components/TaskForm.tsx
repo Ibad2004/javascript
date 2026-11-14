@@ -263,7 +263,7 @@ export function TaskForm({
 
       {submitError !== null && <p className="form-error">{submitError}</p>}
       <div className="form-buttons">
-        <button type="submit" disabled={isSaving}>
+        <button type="submit" className="button-primary" disabled={isSaving}>
           {isSaving ? 'Saving…' : submitLabel}
         </button>
         {onCancel !== undefined && (

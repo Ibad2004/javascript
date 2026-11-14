@@ -155,7 +155,7 @@ function TaskDetailView({ id, today }: { id: string; today: string }) {
     <main aria-busy={loadState.status === 'loading'}>
       <p className="back-link">
         <Link to={listPath} onClick={(event) => guardLink(event, listPath)}>
-          <span aria-hidden="true">← </span>Back to tasks
+          <span aria-hidden="true">←</span>Back to tasks
         </Link>
       </p>
       <section className="panel" aria-labelledby={focusIds.pageHeading}>

@@ -15,7 +15,9 @@ export function TaskDetail({ task, today }: TaskDetailProps) {
       <dt>Status</dt>
       <dd>{task.done ? 'Done' : 'Not done'}</dd>
       <dt>Priority</dt>
-      <dd>{PRIORITY_LABELS[task.priority]}</dd>
+      <dd>
+        <span className={`badge badge-${task.priority}`}>{PRIORITY_LABELS[task.priority]}</span>
+      </dd>
       <dt>Due date</dt>
       <dd className={`due due-${getDueStatus(task, today)}`}>{getDueLabel(task, today)}</dd>
       <dt>Description</dt>

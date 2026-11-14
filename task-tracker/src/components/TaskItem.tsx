@@ -8,7 +8,7 @@ import { PRIORITY_LABELS } from '../utils/tasks';
 type TaskItemProps = {
   task: Task;
   onToggleDone: (id: string) => void;
-  /** No confirm dialog: the list shows an Undo bar instead. */
+  /** Opens the confirm dialog (the list page owns it); after "Delete" an Undo bar shows too. */
   onDelete: (id: string) => void;
   /** The user's local date, "YYYY-MM-DD". */
   today: string;
@@ -31,7 +31,10 @@ export function TaskItem({ task, onToggleDone, onDelete, today, busy = false }: 
   const listSearch = useLocation().search;
 
   return (
-    <li className={`task-item${task.done ? ' is-done' : ''}`} aria-busy={busy}>
+    <li
+      className={`task-item priority-${task.priority}${task.done ? ' is-done' : ''}`}
+      aria-busy={busy}
+    >
       {/* The label text is hidden on screen (the title is right next to it) but read by screen readers. */}
       <label className="task-check">
         <input
@@ -43,19 +46,16 @@ export function TaskItem({ task, onToggleDone, onDelete, today, busy = false }: 
         />
         <span className="visually-hidden">Mark {task.title} as done</span>
       </label>
-      <Link
-        to={path}
-        state={{ listSearch }}
-        id={focusIds.link(task.id)}
-        className={`task-button priority-${task.priority}`}
-      >
+      <Link to={path} state={{ listSearch }} id={focusIds.link(task.id)} className="task-button">
         <span className="task-title" dir="auto">
           {task.title}
         </span>
         {/* Status, priority and due date are written as text, not only shown by colour. */}
         <span className="task-meta">
           <span>{task.done ? 'Done' : 'Not done'}</span>
-          <span>Priority: {PRIORITY_LABELS[task.priority]}</span>
+          <span className={`badge badge-${task.priority}`}>
+            Priority: {PRIORITY_LABELS[task.priority]}
+          </span>
           <span className={`due due-${dueStatus}`}>{getDueLabel(task, today)}</span>
           {busy && <span className="saving-tag">Saving…</span>}
         </span>

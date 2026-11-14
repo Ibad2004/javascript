@@ -111,7 +111,7 @@ export function TaskListPage({ today }: { today: string }) {
   }
 
   return (
-    <main>
+    <main className="list-page">
       <section
         className="panel"
         aria-labelledby={focusIds.pageHeading}

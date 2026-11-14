@@ -14,7 +14,7 @@ export function UnsavedChangesBar({ id, onSave, onDiscard }: UnsavedChangesBarPr
     <div id={id} className="unsaved-bar" role="group" aria-labelledby={`${id}-text`} tabIndex={-1}>
       <p id={`${id}-text`}>You have unsaved changes</p>
       <div className="bar-buttons">
-        <button type="button" onClick={onSave}>
+        <button type="button" className="button-primary" onClick={onSave}>
           Save
         </button>
         <button type="button" onClick={onDiscard}>

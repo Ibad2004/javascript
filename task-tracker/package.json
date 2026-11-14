@@ -31,6 +31,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "axe-core": "4.14.0",
     "concurrently": "10.0.7",
     "jsdom": "^31.0.0",
     "json-server": "0.17.4",

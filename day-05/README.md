@@ -329,8 +329,18 @@ This is what makes the next example work:
   };
 ```
 
-`clearSaved()` runs **before** `fn`. So if `fn` throws an error, the error still reaches the
-caller, but the debounced function is already reset and keeps working for the next call.
+`clearSaved()` runs **before** `fn`, so the wrapper is already reset when `fn` runs and keeps
+working for the next call even if `fn` throws. Who sees the error depends on **which call** ran `fn`:
+
+- **Leading call or `flush()`**: `fn` runs inside the caller's own call, so the caller can
+  `try`/`catch` the error.
+- **Trailing call**: `fn` runs from a `setTimeout` callback, long after the caller has returned.
+  No caller is on the stack, so the error **cannot be caught by the caller**. It becomes an
+  uncaught exception (in Node it crashes the process unless there is a global
+  `process.on("uncaughtException")` handler). Catch errors **inside** `fn` if it can fail.
+
+The snippet above is only a usage demo of `this`; the implementation is in
+[debounce.js](debounce.js) (see "Debounce: full code").
 
 ### `leading` and `trailing`
 
@@ -356,6 +366,8 @@ args, the old timer would still fire later and run the **next** call too early. 
 for exactly this ("cancel then call again", "flush then call again").
 
 ### Debounce: full code
+
+> Implementation: this is the content of [debounce.js](debounce.js).
 
 ```js
 import { validateTimingArgs } from "./validate.js";
@@ -423,6 +435,8 @@ export function debounce(fn, wait, { leading = false, trailing = true } = {}) {
 ```
 
 ### Throttle: full code
+
+> Implementation: this is the content of [throttle.js](throttle.js).
 
 `windowStart` is the time the current window began: the time of the last run, or the
 first call when `leading` is `false`.
@@ -535,6 +549,8 @@ accepts. A bigger value does not wait longer: Node prints a warning and runs the
 so it is rejected instead.
 
 ### Demo: debounce
+
+> Demo only (from [04-debounce-demo.js](04-debounce-demo.js)). It is not part of the implementation.
 
 ```js
   let typed = "";
@@ -675,7 +691,7 @@ function advance(ms) {
 | Clock goes backwards (`now < last run`) | Treated as a new window, runs | a clock that goes backwards |
 | `cancel()` / `flush()` with nothing pending | Does nothing, no error | cancel with nothing pending / flush with nothing pending |
 | `cancel()` or `flush()`, then a new call | Old timer is cleared, new call runs at the right time | cancel then call again / flush then call again |
-| `fn` throws | Leading call and `flush()`: the error reaches the caller. Trailing (timer) call: there is no caller, so the error is uncaught, but the wrapper was already reset and keeps working | keeps working after fn throws |
+| `fn` throws | Leading call and `flush()`: the error reaches the caller. Trailing (timer) call: there is no caller, so the error is uncaught, but the wrapper was already reset and keeps working | keeps working after fn throws (leading/flush errors are catchable, trailing errors are not) |
 | Two wrappers made from the same code | Do not share state | separate instances do not share state |
 
 ### Mutation check

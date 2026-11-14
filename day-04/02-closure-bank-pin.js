@@ -5,11 +5,13 @@ function createAccount(owner, pin) {
 
   return {
     deposit(amount) {
+      if (amount <= 0) return "Deposit must be more than 0";
       balance += amount;
       return `${owner} deposited ${amount}`;
     },
     withdraw(amount, enteredPin) {
       if (!checkPin(enteredPin)) return "Wrong PIN";
+      if (amount <= 0) return "Withdrawal must be more than 0";
       if (amount > balance) return "Not enough balance";
       balance -= amount;
       return `${owner} withdrew ${amount}`;

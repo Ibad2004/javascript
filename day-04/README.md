@@ -287,6 +287,8 @@ loose(); // Error: Cannot read properties of undefined (reading 'name')
 Nothing is on the left of the dot any more, so `this` is `undefined`
 and `this.name` crashes. This is the most common `this` bug.
 
+> What `this` becomes here depends on strict mode. In strict mode (ES modules, like this repo, and classes are always strict) a detached function gets `this = undefined`. In sloppy-mode scripts it falls back to the global object (`globalThis`), so `this.name` is `undefined` instead of crashing.
+
 ### Fixing `this` with `bind` and `call`
 
 ```js
@@ -319,7 +321,9 @@ const team = {
     });
   },
 
-  arrowMethod: () => `arrowMethod sees this = ${this}`,
+  arrowMethod: () => {
+    return `arrowMethod sees this = ${this}`;
+  },
 };
 
 console.log(team.listWithArrow());

@@ -6,6 +6,10 @@ hand-in is a Node script that downloads users and their posts from a public
 API, retries when a request fails for a temporary reason, and saves a summary
 to a JSON file without ever leaving a half-written file behind.
 
+> **Day 6 is the frozen original; Day 8 moved on.** [Day 8](../day-08/README.md) is a TypeScript
+> copy of this code and it keeps changing. It has the same Retry-After and jitter changes as this
+> folder, but later work happens there and is not copied back here.
+
 ## How to run
 
 Run every command from the repository root:
@@ -31,7 +35,7 @@ so the same command works in Bash and in PowerShell.
 | [01-promise-basics.js](01-promise-basics.js) | Promise states, `.then`/`.catch` vs `async`/`await`, `try`/`catch`/`finally`, a rejected promise |
 | [02-promise-all-vs-sequential.js](02-promise-all-vs-sequential.js) | 3 fake 300 ms requests: one by one vs `Promise.all` vs `Promise.allSettled` |
 | [03-retry-demo.js](03-retry-demo.js) | Fake fetch that fails twice then succeeds, a 404 that is not retried, all attempts failing |
-| [fetch-with-retry.test.js](fetch-with-retry.test.js) | 36 tests for retry, backoff, Retry-After, timeout and option checks |
+| [fetch-with-retry.test.js](fetch-with-retry.test.js) | 46 tests for retry, backoff, Retry-After, timeout and option checks |
 | [save-json.test.js](save-json.test.js) | 7 tests for the safe file write |
 | [summary.test.js](summary.test.js) | 17 tests for validation, totals, average and partial failures |
 | [output/users-summary.json](output/users-summary.json) | One real result of `node day-06/main.js` |
@@ -608,27 +612,52 @@ Retry-After when you hit their rate limit; good clients respect it to avoid
 being blocked.
 
 ```js
-function parseRetryAfterMs(headerValue) {
-  if (headerValue === null || !/^\d+$/.test(headerValue.trim())) return null;
-  return Number(headerValue.trim()) * 1000;
+function parseRetryAfterMs(headerValue, now) {
+  if (typeof headerValue !== "string") return null;
+  const value = headerValue.trim();
+  if (/^\d+$/.test(value)) return Number(value) * 1000;
+  if (!/[a-z]/i.test(value)) return null;
+  const date = Date.parse(value);
+  if (Number.isNaN(date)) return null;
+  return Math.max(0, date - now);
 }
 ```
 
-- `headers.get("retry-after")` returns `null` when the header is missing, so
-  that is checked first.
-- `/^\d+$/` means "only digits, from start to end". It accepts `"2"` and `"0"`,
-  and rejects `"-1"`, `"1.5"`, `"soon"`, `""` and the date form
-  (`"Wed, 21 Oct 2026 07:28:00 GMT"`). I only support the seconds form; any
-  other value falls back to normal backoff instead of guessing.
-- `* 1000`: the header is in **seconds**, the timers use **milliseconds**.
-- The value still goes through the `Math.min` cap above, so
-  `Retry-After: 120` waits 5000 ms, not 2 minutes.
+- A missing header gives `null`, so normal backoff is used.
+- **Seconds form** (`"2"`, `"0"`): only digits are accepted (`/^\d+$/`), then `* 1000`
+  because timers use milliseconds. `"-1"`, `"1.5"`, `"soon"` and `""` give `null`.
+- **HTTP date form** (`"Wed, 21 Oct 2026 07:28:00 GMT"`): the wait is the date minus `now`.
+  A date in the past gives `0` (retry right away). A date that cannot be parsed gives `null`
+  (normal backoff). `now` is passed in (the `now` option), so tests do not depend on the clock.
+- The value still goes through the `Math.min` cap, so `Retry-After: 120` waits 5000 ms.
 
-It is only read for status 429:
+It is read for 429 and 503, the two statuses where servers send it:
 
 ```js
-  const retryAfterMs = response.status === 429 ? parseRetryAfterMs(response.headers.get("retry-after")) : null;
+  const retryAfterMs =
+    response.status === 429 || response.status === 503
+      ? parseRetryAfterMs(response.headers.get("retry-after"), now())
+      : null;
 ```
+
+### Jitter
+
+Without jitter, many clients that failed together all retry together. The backoff delay
+is now "equal jitter": half is fixed, half is random. `random` is an option (default
+`Math.random`) so tests pass `() => 0` or `() => 1` and get exact delays.
+
+```js
+function backoffDelay(attempt, { baseDelayMs, random }) {
+  const full = baseDelayMs * 2 ** (attempt - 1);
+  const factor = random();
+  const safeFactor = Number.isFinite(factor) ? Math.min(1, Math.max(0, factor)) : 1;
+  return Math.round(full / 2 + (full / 2) * safeFactor);
+}
+```
+
+Jitter is **not** applied to `Retry-After` (the server named the time). The cap
+`maxDelayMs` is applied last. In the tests the default is `random: () => 1`, which keeps the
+full backoff (500, 1000, ...).
 
 ## 10. Timeout
 
@@ -940,7 +969,9 @@ waits for them.
 | 429 with `Retry-After: 2` | Waits 2000 ms | `Retry-After in seconds is honoured` |
 | 429 with `Retry-After: 120` | Waits 5000 ms (cap) | `Retry-After is capped at maxDelayMs` |
 | 429 with a bad or missing Retry-After | Normal backoff | `invalid or missing Retry-After falls back to normal backoff` |
-| 503 with Retry-After | Header ignored | `Retry-After on a 503 is ignored (only 429 uses it)` |
+| 503 with Retry-After (seconds or HTTP date) | Header used | `Retry-After on a 503 is honoured`, `Retry-After as an HTTP date waits until that date` |
+| Retry-After date in the past | 0 ms | `Retry-After HTTP date in the past means 0` |
+| Backoff with `random` 0 / 1 | Half / full backoff | `random() = 0 gives half of the backoff, 1 gives the full backoff` |
 | Bad URL | `TypeError`, fetch not called | `rejects a bad url with TypeError` |
 | `maxAttempts` 0, 11, 1.5 | `RangeError` | `rejects maxAttempts 0, 11 and 1.5 with RangeError` |
 | `maxAttempts` `"3"` or `NaN` | `TypeError` | `rejects maxAttempts '3', NaN, Infinity and null with TypeError` |

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { fetchJsonWithRetry } from "./fetch-with-retry.js";
 
 const TEST_URL = "https://api.test/users";
+const NOW = Date.parse("2026-11-14T10:00:00Z");
 
 const ok = (data) => () => Response.json(data);
 const status = (code, headers = {}) => () => new Response("error", { status: code, headers });
@@ -31,7 +32,14 @@ function setup(steps, options = {}) {
     delays.push(ms);
   };
   const run = () =>
-    fetchJsonWithRetry(TEST_URL, { fetchFn, sleep, onRetry: (info) => retries.push(info), ...options });
+    fetchJsonWithRetry(TEST_URL, {
+      fetchFn,
+      sleep,
+      random: () => 1, // no jitter reduction, so delays are exact
+      now: () => NOW,
+      onRetry: (info) => retries.push(info),
+      ...options,
+    });
   return { run, calls, delays, retries };
 }
 
@@ -208,7 +216,7 @@ describe("fetchJsonWithRetry: 429 and Retry-After", () => {
   });
 
   test("invalid or missing Retry-After falls back to normal backoff", async () => {
-    for (const value of ["soon", "-1", "1.5", "", "Wed, 21 Oct 2026 07:28:00 GMT", null]) {
+    for (const value of ["soon", "-1", "1.5", "", "31 Feb 2026 25:61:00 GMT", null]) {
       const headers = value === null ? {} : { "Retry-After": value };
       const { run, delays } = setup([status(429, headers), ok("ok")]);
       await run();
@@ -216,10 +224,77 @@ describe("fetchJsonWithRetry: 429 and Retry-After", () => {
     }
   });
 
-  test("Retry-After on a 503 is ignored (only 429 uses it)", async () => {
+  test("Retry-After on a 503 is honoured", async () => {
     const { run, delays } = setup([status(503, { "Retry-After": "3" }), ok("ok")]);
     await run();
+    assert.deepEqual(delays, [3000]);
+  });
+
+  test("Retry-After as an HTTP date waits until that date", async () => {
+    const { run, delays } = setup([status(429, { "Retry-After": "Sat, 14 Nov 2026 10:00:02 GMT" }), ok("ok")]);
+    await run();
+    assert.deepEqual(delays, [2000]);
+  });
+
+  test("Retry-After HTTP date on a 503 works too", async () => {
+    const { run, delays } = setup([status(503, { "Retry-After": "Sat, 14 Nov 2026 10:00:04 GMT" }), ok("ok")]);
+    await run();
+    assert.deepEqual(delays, [4000]);
+  });
+
+  test("Retry-After HTTP date in the past means 0", async () => {
+    const { run, delays } = setup([status(503, { "Retry-After": "Wed, 21 Oct 2026 07:28:00 GMT" }), ok("ok")]);
+    await run();
+    assert.deepEqual(delays, [0]);
+  });
+
+  test("Retry-After on other statuses (500) is ignored", async () => {
+    const { run, delays } = setup([status(500, { "Retry-After": "3" }), ok("ok")]);
+    await run();
     assert.deepEqual(delays, [500]);
+  });
+});
+
+describe("fetchJsonWithRetry: jitter", () => {
+  test("random() = 0 gives half of the backoff, 1 gives the full backoff", async () => {
+    const low = setup([status(500), status(500), ok("ok")], { random: () => 0 });
+    await low.run();
+    assert.deepEqual(low.delays, [250, 500]);
+    const high = setup([status(500), status(500), ok("ok")], { random: () => 1 });
+    await high.run();
+    assert.deepEqual(high.delays, [500, 1000]);
+  });
+
+  test("random() = 0.5 gives three quarters of the backoff", async () => {
+    const { run, delays } = setup([status(500), ok("ok")], { random: () => 0.5 });
+    await run();
+    assert.deepEqual(delays, [375]);
+  });
+
+  test("a bad random() value is clamped, never gives a negative or huge delay", async () => {
+    for (const value of [-5, 7, NaN]) {
+      const { run, delays } = setup([status(500), ok("ok")], { random: () => value });
+      await run();
+      assert.ok(delays[0] >= 250 && delays[0] <= 500, `random() = ${value}`);
+    }
+  });
+
+  test("jitter is not applied to Retry-After", async () => {
+    const { run, delays } = setup([status(429, { "Retry-After": "2" }), ok("ok")], { random: () => 0 });
+    await run();
+    assert.deepEqual(delays, [2000]);
+  });
+
+  test("jittered delay is still capped at maxDelayMs", async () => {
+    const { run, delays } = setup([status(500), status(500), ok("ok")], { baseDelayMs: 4000, maxDelayMs: 5000, random: () => 1 });
+    await run();
+    assert.deepEqual(delays, [4000, 5000]);
+  });
+
+  test("rejects a non-function random and now", async () => {
+    for (const name of ["random", "now"]) {
+      await assert.rejects(setup([ok(1)], { [name]: 5 }).run(), TypeError);
+    }
   });
 });
 

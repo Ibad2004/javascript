@@ -44,9 +44,11 @@ function resolveOptions(url, options) {
     maxDelayMs = config.maxDelayMs,
     fetchFn = fetch,
     sleep = delay,
+    random = Math.random,
+    now = Date.now,
     onRetry = () => {},
   } = options;
-  const settings = { maxAttempts, timeoutMs, baseDelayMs, maxDelayMs, fetchFn, sleep, onRetry };
+  const settings = { maxAttempts, timeoutMs, baseDelayMs, maxDelayMs, fetchFn, sleep, random, now, onRetry };
   checkNumber("maxAttempts", settings.maxAttempts, 1, MAX_ATTEMPTS_LIMIT);
   if (!Number.isInteger(settings.maxAttempts)) {
     throw new RangeError(`maxAttempts must be a whole number, got ${settings.maxAttempts}`);
@@ -56,6 +58,8 @@ function resolveOptions(url, options) {
   checkNumber("maxDelayMs", settings.maxDelayMs, settings.baseDelayMs, MAX_TIMER_MS);
   checkFunction("fetchFn", settings.fetchFn);
   checkFunction("sleep", settings.sleep);
+  checkFunction("random", settings.random);
+  checkFunction("now", settings.now);
   checkFunction("onRetry", settings.onRetry);
   return settings;
 }
@@ -64,13 +68,21 @@ function requestError(reason, { retryable, status = null, retryAfterMs = null, c
   return Object.assign(new Error(reason, { cause }), { retryable, status, retryAfterMs });
 }
 
-function parseRetryAfterMs(headerValue) {
-  if (headerValue === null || !/^\d+$/.test(headerValue.trim())) return null;
-  return Number(headerValue.trim()) * 1000;
+export function parseRetryAfterMs(headerValue, now) {
+  if (typeof headerValue !== "string") return null;
+  const value = headerValue.trim();
+  if (/^\d+$/.test(value)) return Number(value) * 1000;
+  if (!/[a-z]/i.test(value)) return null;
+  const date = Date.parse(value);
+  if (Number.isNaN(date)) return null;
+  return Math.max(0, date - now);
 }
 
-function httpError(response) {
-  const retryAfterMs = response.status === 429 ? parseRetryAfterMs(response.headers.get("retry-after")) : null;
+function httpError(response, now) {
+  const retryAfterMs =
+    response.status === 429 || response.status === 503
+      ? parseRetryAfterMs(response.headers.get("retry-after"), now())
+      : null;
   return requestError(`HTTP ${response.status}`, {
     retryable: RETRYABLE_STATUSES.has(response.status),
     status: response.status,
@@ -97,7 +109,7 @@ function parseJson(text) {
   }
 }
 
-async function attemptOnce(url, { timeoutMs, fetchFn }) {
+async function attemptOnce(url, { timeoutMs, fetchFn, now }) {
   let response;
   let text;
   try {
@@ -106,11 +118,17 @@ async function attemptOnce(url, { timeoutMs, fetchFn }) {
   } catch (error) {
     throw networkError(error, timeoutMs);
   }
-  if (!response.ok) throw httpError(response);
+  if (!response.ok) throw httpError(response, now);
   return parseJson(text);
 }
 
-const backoffDelay = (attempt, { baseDelayMs }) => baseDelayMs * 2 ** (attempt - 1);
+// "Equal jitter": half of the backoff is fixed, the other half is random (random() is 0 to 1).
+function backoffDelay(attempt, { baseDelayMs, random }) {
+  const full = baseDelayMs * 2 ** (attempt - 1);
+  const factor = random();
+  const safeFactor = Number.isFinite(factor) ? Math.min(1, Math.max(0, factor)) : 1;
+  return Math.round(full / 2 + (full / 2) * safeFactor);
+}
 
 const retryDelay = (error, attempt, settings) =>
   Math.min(error.retryAfterMs ?? backoffDelay(attempt, settings), settings.maxDelayMs);

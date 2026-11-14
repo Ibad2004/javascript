@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
+import { ConfirmDeleteDialog } from '../components/ConfirmDeleteDialog';
 import { Notice } from '../components/Notice';
 import { TaskDetail } from '../components/TaskDetail';
 import { TaskForm } from '../components/TaskForm';
@@ -55,6 +56,7 @@ function TaskDetailView({ id, today }: { id: string; today: string }) {
   const [isDirty, setIsDirty] = useState(false);
   // Where the user tried to go while the form had unsaved changes.
   const [pendingTo, setPendingTo] = useState<string | null>(null);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const listPath = listPathFrom(location.state);
 
@@ -131,11 +133,22 @@ function TaskDetailView({ id, today }: { id: string; today: string }) {
     setIsEditing(true);
   }
 
+  /** Delete asks first (the dialog). A busy task opens no dialog. */
   function handleDelete() {
     if (isBusy(id)) return;
+    setIsConfirmingDelete(true);
+  }
+
+  function confirmDelete() {
+    setIsConfirmingDelete(false);
     // Same batch as the delete: the list (with its Undo bar) shows next, not "Task not found".
     void removeTask(id);
     backToList();
+  }
+
+  function cancelDelete() {
+    setIsConfirmingDelete(false);
+    requestFocus(focusIds.detailDelete);
   }
 
   return (
@@ -213,6 +226,7 @@ function TaskDetailView({ id, today }: { id: string; today: string }) {
               )}
               <button
                 type="button"
+                id={focusIds.detailDelete}
                 className="delete-button"
                 aria-disabled={busy}
                 onClick={handleDelete}
@@ -220,6 +234,13 @@ function TaskDetailView({ id, today }: { id: string; today: string }) {
                 Delete
               </button>
             </div>
+            {isConfirmingDelete && (
+              <ConfirmDeleteDialog
+                title={task.title}
+                onConfirm={confirmDelete}
+                onCancel={cancelDelete}
+              />
+            )}
           </>
         )}
       </section>

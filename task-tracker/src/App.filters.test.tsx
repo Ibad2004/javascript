@@ -9,6 +9,7 @@ import {
   liveRegion,
   renderApp,
   taskLink,
+  deleteAndConfirm,
 } from './test/renderApp';
 import type { Task } from './types';
 
@@ -162,7 +163,7 @@ describe('App: filters', () => {
 
   it('Undo of a task the filters now hide says so', async () => {
     const { user } = await renderApp(tasks);
-    await user.click(screen.getByRole('button', { name: 'Delete Buy milk' }));
+    await deleteAndConfirm(user, 'Delete Buy milk');
     await user.click(statusButton('Done'));
     await user.click(screen.getByRole('button', { name: 'Undo' }));
     expect(

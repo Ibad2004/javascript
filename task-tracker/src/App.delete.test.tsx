@@ -6,7 +6,14 @@ import {
   useFakeTimersWithTestingLibrary,
 } from './test/fakeTimers';
 import { makeTask } from './test/makeTask';
-import { listedTitles, liveRegion, pageHeading, renderApp, taskLink } from './test/renderApp';
+import {
+  listedTitles,
+  liveRegion,
+  pageHeading,
+  renderApp,
+  taskLink,
+  deleteAndConfirm,
+} from './test/renderApp';
 import type { Task } from './types';
 
 // Sorted by due date, so the list order is A, B, C.
@@ -40,10 +47,10 @@ function undoButton() {
 }
 
 describe('App: deleting tasks', () => {
-  it('deletes without a confirm dialog, shows the Undo bar and announces it', async () => {
+  it('deletes after the dialog (never window.confirm), shows the Undo bar and announces it', async () => {
     const confirmSpy = vi.spyOn(window, 'confirm');
     const { user } = await setup();
-    await user.click(screen.getByRole('button', { name: 'Delete Task B' }));
+    await deleteAndConfirm(user, 'Delete Task B');
 
     expect(listedTitles()).toEqual(['Task A', 'Task C']);
     expect(screen.getByText('Task deleted.')).toBeVisible();
@@ -55,20 +62,20 @@ describe('App: deleting tasks', () => {
 
   it('moves focus to the next task, then the previous one, then the list heading', async () => {
     const { user } = await setup();
-    await user.click(screen.getByRole('button', { name: 'Delete Task B' }));
+    await deleteAndConfirm(user, 'Delete Task B');
     expect(taskLink('Task C')).toHaveFocus();
 
-    await user.click(screen.getByRole('button', { name: 'Delete Task C' }));
+    await deleteAndConfirm(user, 'Delete Task C');
     expect(taskLink('Task A')).toHaveFocus();
 
-    await user.click(screen.getByRole('button', { name: 'Delete Task A' }));
+    await deleteAndConfirm(user, 'Delete Task A');
     expect(pageHeading()).toHaveFocus();
   });
 
   it('deleting every task shows the empty state again', async () => {
     const { user } = await setup();
     for (const name of ['Task A', 'Task B', 'Task C']) {
-      await user.click(screen.getByRole('button', { name: `Delete ${name}` }));
+      await deleteAndConfirm(user, `Delete ${name}`);
     }
     expect(screen.getByText('No tasks yet. Add your first task below.')).toBeInTheDocument();
     expect(screen.getByText('No tasks yet')).toBeInTheDocument();
@@ -77,7 +84,7 @@ describe('App: deleting tasks', () => {
 
   it('Undo puts the task back in the same place, announces it and focuses it', async () => {
     const { user } = await setup();
-    await user.click(screen.getByRole('button', { name: 'Delete Task B' }));
+    await deleteAndConfirm(user, 'Delete Task B');
     const undo = undoButton();
     expect(undo).not.toBeNull();
     if (undo === null) return;
@@ -91,16 +98,16 @@ describe('App: deleting tasks', () => {
 
   it('Undo still works after deleting everything (the old position no longer exists)', async () => {
     const { user } = await setup();
-    await user.click(screen.getByRole('button', { name: 'Delete Task C' }));
-    await user.click(screen.getByRole('button', { name: 'Delete Task A' }));
-    await user.click(screen.getByRole('button', { name: 'Delete Task B' }));
+    await deleteAndConfirm(user, 'Delete Task C');
+    await deleteAndConfirm(user, 'Delete Task A');
+    await deleteAndConfirm(user, 'Delete Task B');
     await user.click(screen.getByRole('button', { name: 'Undo' }));
     expect(listedTitles()).toEqual(['Task B']);
   });
 
   it('the Undo bar goes away after about 5 seconds', async () => {
     const { user } = await setup();
-    await user.click(screen.getByRole('button', { name: 'Delete Task B' }));
+    await deleteAndConfirm(user, 'Delete Task B');
     wait(4900);
     expect(undoButton()).toBeInTheDocument();
     wait(200);
@@ -110,7 +117,7 @@ describe('App: deleting tasks', () => {
 
   it('pauses the timer while the bar is hovered and keeps the time left', async () => {
     const { user } = await setup();
-    await user.click(screen.getByRole('button', { name: 'Delete Task B' }));
+    await deleteAndConfirm(user, 'Delete Task B');
     const bar = screen.getByRole('group', { name: 'Undo delete' });
 
     wait(3000);
@@ -127,7 +134,7 @@ describe('App: deleting tasks', () => {
 
   it('pauses the timer while the Undo button has keyboard focus', async () => {
     const { user } = await setup();
-    await user.click(screen.getByRole('button', { name: 'Delete Task B' }));
+    await deleteAndConfirm(user, 'Delete Task B');
     // Focus moved to Task C. The Undo bar sits just above the list, so from the
     // first task (A) Shift+Tab twice (past A's checkbox) reaches the Undo button.
     act(() => taskLink('Task A').focus());
@@ -144,9 +151,9 @@ describe('App: deleting tasks', () => {
 
   it('only the latest delete can be undone, and it gets a fresh 5 seconds', async () => {
     const { user } = await setup();
-    await user.click(screen.getByRole('button', { name: 'Delete Task A' }));
+    await deleteAndConfirm(user, 'Delete Task A');
     wait(4000);
-    await user.click(screen.getByRole('button', { name: 'Delete Task B' }));
+    await deleteAndConfirm(user, 'Delete Task B');
     expect(screen.getAllByRole('button', { name: 'Undo' })).toHaveLength(1);
 
     wait(4000); // 8 s after the first delete, 4 s after the second
@@ -158,7 +165,7 @@ describe('App: deleting tasks', () => {
   it('Delete on the task page goes to the list, where the Undo bar is (it lives in the context)', async () => {
     const { user, server } = await setup(tasks, '/tasks/b');
     expect(pageHeading()).toHaveTextContent('Task B');
-    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await deleteAndConfirm(user, 'Delete');
 
     expect(pageHeading()).toHaveTextContent('Tasks');
     expect(listedTitles()).toEqual(['Task A', 'Task C']);
@@ -176,7 +183,7 @@ describe('App: deleting tasks', () => {
     const { user } = await setup(tasks, '/tasks/b');
     await user.click(screen.getByRole('button', { name: 'Edit' }));
     await user.type(screen.getByLabelText('Title'), ' changed');
-    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await deleteAndConfirm(user, 'Delete');
 
     expect(pageHeading()).toHaveTextContent('Tasks');
     expect(screen.queryByRole('group', { name: /unsaved/ })).not.toBeInTheDocument();
@@ -186,7 +193,7 @@ describe('App: deleting tasks', () => {
 
   it('clears the timer when the app unmounts (no leak)', async () => {
     const { user, unmount } = await setup();
-    await user.click(screen.getByRole('button', { name: 'Delete Task B' }));
+    await deleteAndConfirm(user, 'Delete Task B');
     expect(vi.getTimerCount()).toBeGreaterThan(0);
     unmount();
     expect(vi.getTimerCount()).toBe(0);

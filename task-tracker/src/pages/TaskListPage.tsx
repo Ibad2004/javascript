@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { useSearchParams } from 'react-router';
+import { ConfirmDeleteDialog } from '../components/ConfirmDeleteDialog';
 import { Notice } from '../components/Notice';
 import { TaskFilters } from '../components/TaskFilters';
 import { TaskForm } from '../components/TaskForm';
@@ -30,6 +32,7 @@ export function TaskListPage({ today }: { today: string }) {
     tasks,
     skippedCount,
     busyIds,
+    isBusy,
     lastDeleted,
     clearLastDeleted,
     filterNotice,
@@ -45,6 +48,9 @@ export function TaskListPage({ today }: { today: string }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = readFilters(searchParams);
   useDocumentTitle(pageTitle());
+  // The task the delete dialog asks about. null = no dialog.
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const confirmDeleteTask = tasks.find((task) => task.id === confirmDeleteId) ?? null;
 
   // Calculated during render: no effect, no filtered copy in state.
   const visibleTasks = filterTasks(tasks, filters);
@@ -83,8 +89,21 @@ export function TaskListPage({ today }: { today: string }) {
     void toggleDone(id, { hiddenBy: isHidden, hiddenFocusId: neighbourFocusId(id) });
   }
 
+  /** Delete asks first. A busy task (a request running) opens no dialog. */
   function handleDelete(id: string) {
+    if (isBusy(id)) return;
+    setConfirmDeleteId(id);
+  }
+
+  function confirmDelete(id: string) {
+    setConfirmDeleteId(null);
     void removeTask(id, { focusId: neighbourFocusId(id) });
+  }
+
+  function cancelDelete(id: string) {
+    setConfirmDeleteId(null);
+    // Back to the Delete button that opened the dialog.
+    requestFocus(focusIds.remove(id));
   }
 
   function handleAdd(input: TaskInput) {
@@ -184,6 +203,14 @@ export function TaskListPage({ today }: { today: string }) {
             clearOnSubmit
           />
         </section>
+      )}
+      {confirmDeleteTask !== null && (
+        <ConfirmDeleteDialog
+          key={confirmDeleteTask.id}
+          title={confirmDeleteTask.title}
+          onConfirm={() => confirmDelete(confirmDeleteTask.id)}
+          onCancel={() => cancelDelete(confirmDeleteTask.id)}
+        />
       )}
     </main>
   );

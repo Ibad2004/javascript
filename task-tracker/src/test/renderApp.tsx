@@ -94,3 +94,17 @@ export function liveRegion(): HTMLElement {
   if (region === null) throw new Error('The live region is missing');
   return region;
 }
+
+/** The open delete dialog. */
+export function deleteDialog() {
+  return screen.getByRole('dialog');
+}
+
+/**
+ * Since Day 15 Delete asks first: clicks the button named `name` (e.g. "Delete Task B"),
+ * then "Delete" in the dialog.
+ */
+export async function deleteAndConfirm(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(screen.getByRole('button', { name }));
+  await user.click(within(deleteDialog()).getByRole('button', { name: 'Delete' }));
+}

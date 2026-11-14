@@ -1,7 +1,14 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { makeTask } from './test/makeTask';
-import { addForm, listedTitles, liveRegion, pageHeading, renderApp } from './test/renderApp';
+import {
+  addForm,
+  listedTitles,
+  liveRegion,
+  pageHeading,
+  renderApp,
+  deleteAndConfirm,
+} from './test/renderApp';
 
 const tasks = [
   makeTask({ id: 'a', title: 'Task A', dueDate: '2026-11-11' }),
@@ -244,7 +251,7 @@ describe('App: delete is optimistic, Undo re-creates', () => {
   it('a failed delete puts the task back with "Couldn\'t delete. The task is back."', async () => {
     const { user, server } = await renderApp(tasks);
     server.goOffline();
-    await user.click(screen.getByRole('button', { name: 'Delete Task B' }));
+    await deleteAndConfirm(user, 'Delete Task B');
 
     expect(listedTitles()).toEqual(['Task A', 'Task B', 'Task C']);
     expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument();
@@ -254,7 +261,7 @@ describe('App: delete is optimistic, Undo re-creates', () => {
 
   it('Undo re-creates the task on the server with the SAME id and fields', async () => {
     const { user, server } = await renderApp(tasks);
-    await user.click(screen.getByRole('button', { name: 'Delete Task B' }));
+    await deleteAndConfirm(user, 'Delete Task B');
     expect(server.task('b')).toBeUndefined();
 
     await user.click(screen.getByRole('button', { name: 'Undo' }));
@@ -266,7 +273,7 @@ describe('App: delete is optimistic, Undo re-creates', () => {
   it('Undo waits while the DELETE is still running (no overlapping requests)', async () => {
     const { user, server } = await renderApp(tasks);
     const hold = server.holdNext();
-    await user.click(screen.getByRole('button', { name: 'Delete Task B' }));
+    await deleteAndConfirm(user, 'Delete Task B');
     const undo = screen.getByRole('button', { name: 'Undo' });
     expect(undo).toHaveAttribute('aria-disabled', 'true');
     await user.click(undo);
@@ -281,7 +288,7 @@ describe('App: delete is optimistic, Undo re-creates', () => {
 
   it('if Undo fails it says so, the task stays gone and Undo is offered again', async () => {
     const { user, server } = await renderApp(tasks);
-    await user.click(screen.getByRole('button', { name: 'Delete Task B' }));
+    await deleteAndConfirm(user, 'Delete Task B');
     server.failNext(500);
     await user.click(screen.getByRole('button', { name: 'Undo' }));
 
@@ -295,7 +302,7 @@ describe('App: delete is optimistic, Undo re-creates', () => {
   it('404 on delete (already deleted in another tab): message, no Undo', async () => {
     const { user, server } = await renderApp(tasks);
     server.deleteFromAnotherTab('b');
-    await user.click(screen.getByRole('button', { name: 'Delete Task B' }));
+    await deleteAndConfirm(user, 'Delete Task B');
     expect(listedTitles()).toEqual(['Task A', 'Task C']);
     expect(notice()).toHaveTextContent('This task no longer exists');
     expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument();

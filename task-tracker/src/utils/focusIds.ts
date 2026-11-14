@@ -11,5 +11,6 @@ export const focusIds = {
   pageHeading: 'page-heading',
   unsavedBar: 'unsaved-bar',
   detailEdit: 'detail-edit',
+  detailDelete: 'detail-delete',
   search: 'task-search',
 };

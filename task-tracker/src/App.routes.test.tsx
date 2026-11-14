@@ -4,7 +4,14 @@ import { describe, expect, it } from 'vitest';
 import { App } from './App';
 import { startFakeServer } from './test/fakeServer';
 import { FAKE_TODAY, makeTask } from './test/makeTask';
-import { inRouter, listedTitles, pageHeading, renderApp, taskLink } from './test/renderApp';
+import {
+  inRouter,
+  listedTitles,
+  pageHeading,
+  renderApp,
+  taskLink,
+  deleteAndConfirm,
+} from './test/renderApp';
 import type { Task } from './types';
 
 const LONG_TITLE = 'Prepare the quarterly report for the finance team and send it';
@@ -152,7 +159,7 @@ describe('detail page: loading, not found, errors', () => {
   it('a 404 on Delete from the detail page: the list, the message, no Undo', async () => {
     const { user, server } = await renderApp(tasks, { route: '/tasks/a' });
     server.deleteFromAnotherTab('a');
-    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await deleteAndConfirm(user, 'Delete');
 
     expect(pageHeading()).toHaveTextContent('Tasks');
     await waitFor(() => expect(notice()).toHaveTextContent('This task no longer exists'));

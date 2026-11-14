@@ -12,7 +12,14 @@ import {
 import { hangingFetch, jsonResponse, mockFetch, networkError } from './test/fetchMock';
 import { startFakeServer } from './test/fakeServer';
 import { FAKE_TODAY, makeTask } from './test/makeTask';
-import { inRouter, listedTitles, liveRegion, renderApp, waitForLoad } from './test/renderApp';
+import {
+  inRouter,
+  listedTitles,
+  liveRegion,
+  renderApp,
+  waitForLoad,
+  deleteAndConfirm,
+} from './test/renderApp';
 
 const tasks = [
   makeTask({ id: 'a', title: 'Task A', dueDate: '2026-11-11' }),
@@ -188,7 +195,7 @@ describe('App: loading the tasks (useEffect + fetch)', () => {
   it('reload keeps the changes (they live on the server, not in the page)', async () => {
     const first = await renderApp(tasks);
     await first.user.click(screen.getByRole('checkbox', { name: 'Mark Task A as done' }));
-    await first.user.click(screen.getByRole('button', { name: 'Delete Task B' }));
+    await deleteAndConfirm(first.user, 'Delete Task B');
     first.unmount();
 
     // A "reload": a fresh App reading the same server data.

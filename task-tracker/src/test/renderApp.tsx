@@ -55,6 +55,9 @@ export async function renderApp(serverData: readonly unknown[], options: Options
 /** Waits until "Loading tasks…" / "Loading task…" is gone (the page or the error is shown). */
 export async function waitForLoad() {
   await waitFor(() => expect(screen.queryByText(/^Loading tasks?…$/)).not.toBeInTheDocument());
+  // The tab title is set in an effect, which can run a moment AFTER the DOM update above.
+  // Under a busy full test run that gap made a title check fail now and then.
+  await waitFor(() => expect(document.title).not.toMatch(/^Loading/));
 }
 
 export function taskList() {

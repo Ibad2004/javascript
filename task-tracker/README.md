@@ -3,15 +3,15 @@
 A small task tracker built with **Vite + React + TypeScript**.
 This is a one-week project: every day I add to the **same app**.
 
-| Day | What the day adds                                                                                         | Status  |
-| --- | --------------------------------------------------------------------------------------------------------- | ------- |
-| 11  | Tracker pages with **static data**: components, JSX, props, state                                         | Done    |
-| 12  | Add, edit and delete tasks **in memory**: events, forms, controlled inputs, lists and keys                | Done    |
-| 13  | Read tasks from a mock API (**json-server**): `useEffect`, fetching, loading and error states             | Done    |
-| 14  | Filters, a task detail page and a `useTasks` hook: custom hooks, lifting state, context, **React Router** | Done    |
-| 15  | Styling, basic accessibility and a responsive layout, then deploy on **Vercel**                           | Planned |
+| Day | What the day adds                                                                                         | Status                                        |
+| --- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| 11  | Tracker pages with **static data**: components, JSX, props, state                                         | Done                                          |
+| 12  | Add, edit and delete tasks **in memory**: events, forms, controlled inputs, lists and keys                | Done                                          |
+| 13  | Read tasks from a mock API (**json-server**): `useEffect`, fetching, loading and error states             | Done                                          |
+| 14  | Filters, a task detail page and a `useTasks` hook: custom hooks, lifting state, context, **React Router** | Done                                          |
+| 15  | Styling, basic accessibility and a responsive layout, then deploy on **Vercel**                           | Part A done (look, a11y, dialog); deploy next |
 
-Day 15 is planned. Since Day 13 the tasks are saved on a local mock server (json-server), so a
+Day 15 part A (the look, accessibility, the delete dialog) is done; the deploy is part B. Since Day 13 the tasks are saved on a local mock server (json-server), so a
 page refresh keeps the changes. The header says so on screen too.
 
 ## How to run
@@ -70,12 +70,14 @@ BrowserRouter (main.tsx)   MemoryRouter in the tests
             │   │   ├── <p> no match      "No tasks match these filters. [Clear filters]"
             │   │   ├── TaskList          the <ul>, key = task.id
             │   │   │   └── TaskItem      [checkbox] [link: title + info] [Edit link] [Delete]
-            │   │   └── TaskForm          ADD mode, clears after a save
+            │   │   ├── TaskForm          ADD mode, clears after a save
+│   │   └── ConfirmDeleteDialog  <dialog> "Delete “title”? … [Cancel] [Delete]" (only while asking)
             │   ├── "/tasks/:id"  TaskDetailPage (key = id)
             │   │   ├── "← Back to tasks" link (keeps the list's filters)
             │   │   ├── TaskDetail        the task (<h1> = title), or "Loading task…" / "Task not found"
             │   │   ├── UnsavedChangesBar "You have unsaved changes [Save] [Discard]"
-            │   │   └── TaskForm          EDIT mode, prefilled
+            │   │   ├── TaskForm          EDIT mode, prefilled
+│   │   └── ConfirmDeleteDialog  the same dialog for the page's Delete button
             │   └── "*"           NotFoundPage   "Page not found" + "Go to your tasks"
             └── LiveRegion  visually hidden role=status, outside the routes so messages survive a navigation
 ```
@@ -152,6 +154,127 @@ props. The filters are **not** React state at all: they live in the URL.
 State is never changed in place. Every update builds a new array or object with spread, `map`,
 `filter` or `toSpliced`, and the pure functions in `src/utils/tasks.ts` are tested on **frozen**
 arrays, so a mutation would throw in the test.
+
+## Day 15 (part A): the look, responsive layout, accessibility and a delete dialog
+
+### What works now
+
+- **Plain CSS + CSS variables**, no framework. `src/styles/tokens.css` holds every colour, the
+  spacing scale, radii, font sizes and shadows. `base.css`, `layout.css` and `components.css` use
+  only `var(--...)`; `src/index.css` just imports the four files in cascade order.
+- **Light and dark theme**: the dark values are a second set of the same tokens under
+  `@media (prefers-color-scheme: dark)`, so no component knows which theme is on.
+- Tasks are **cards** with a coloured edge for the priority, **badges** that say the priority and
+  "Overdue (was due …)" / "Due today" in words (colour is only a hint), and done tasks are struck
+  through. Buttons come in three kinds: secondary (default), **primary** (Add task, Save) and
+  **danger** (the dialog's Delete; the row's Delete is an outlined danger button).
+- **Mobile first**: one column; the status buttons and fields wrap; Edit/Delete and the form
+  buttons are full width on a phone. From 40rem the row actions sit beside the task; from 64rem the
+  add form sits next to the list, inside a 72rem max width.
+- **Delete asks first** with a native `<dialog>` and `showModal()`:
+  "Delete “<title>”? This can be undone for 5 seconds." [Cancel] [Delete]. Focus starts on Cancel.
+  Escape, Cancel or a click on the dark backdrop close it with no change, and focus goes back to the
+  Delete button that opened it. After Delete the **Undo bar still appears** (the dialog stops
+  accidents, Undo is for a change of mind). It works on the list and on the task page.
+- A visible **focus ring** (3px, `--color-focus`) on every interactive element; it is never removed,
+  only recoloured on the dark Undo bar.
+- **Reduced motion**: with `prefers-reduced-motion: reduce` there is no smooth scroll, no
+  transition and no dialog animation.
+
+### Contrast (WCAG AA), checked by a test
+
+`src/styles/styles.test.ts` reads `tokens.css`, computes the WCAG contrast ratio of every pair below
+in **both** themes and fails under 4.5:1 for text or 3:1 for borders and the focus ring. These are
+the real numbers:
+
+| Text pair (must be ≥ 4.5)                       | Light | Dark  |
+| ----------------------------------------------- | ----- | ----- |
+| `--color-text` on `--color-bg`                  | 15.27 | 15.34 |
+| `--color-text` on `--color-surface`             | 16.51 | 13.91 |
+| `--color-text` on `--color-surface-muted`       | 14.57 | 12.02 |
+| `--color-text-muted` on `--color-bg`            | 7.10  | 8.72  |
+| `--color-text-muted` on `--color-surface`       | 7.68  | 7.91  |
+| `--color-primary` on `--color-surface`          | 6.70  | 8.02  |
+| `--color-primary` on `--color-bg`               | 6.20  | 8.85  |
+| `--color-primary-hover` on `--color-surface`    | 8.72  | 10.32 |
+| `--color-on-primary` on `--color-primary`       | 6.70  | 8.96  |
+| `--color-on-primary` on `--color-primary-hover` | 8.72  | 11.53 |
+| `--color-danger` on `--color-surface`           | 6.57  | 8.27  |
+| `--color-on-danger` on `--color-danger`         | 6.57  | 9.46  |
+| `--color-on-danger` on `--color-danger-hover`   | 8.66  | 12.08 |
+| `--color-danger-text` on `--color-danger-bg`    | 9.21  | 11.24 |
+| `--color-warning-text` on `--color-surface`     | 7.48  | 11.80 |
+| `--color-text` on `--color-warning-bg`          | 15.44 | 11.38 |
+| `--color-inverse-text` on `--color-inverse-bg`  | 14.68 | 14.72 |
+| `--badge-high-text` on `--badge-high-bg`        | 7.60  | 10.00 |
+| `--badge-medium-text` on `--badge-medium-bg`    | 7.52  | 8.92  |
+| `--badge-low-text` on `--badge-low-bg`          | 8.62  | 9.22  |
+
+| Non-text pair (must be ≥ 3)                        | Light | Dark |
+| -------------------------------------------------- | ----- | ---- |
+| `--color-focus` on `--color-surface`               | 6.70  | 8.02 |
+| `--color-focus` on `--color-bg`                    | 6.20  | 8.85 |
+| `--color-focus-on-inverse` on `--color-inverse-bg` | 8.14  | 5.56 |
+| `--color-border-strong` on `--color-surface`       | 4.66  | 5.46 |
+| `--color-danger` on `--color-danger-bg`            | 5.75  | 7.85 |
+
+The same test file also fails if any CSS file other than `tokens.css` has a raw colour (hex,
+`rgb()`, `hsl()` …), if a `var(--x)` is not defined, if an `outline: none` appears, if the
+reduced-motion block is missing, or if `.dialog-title`, `.task-title` or `.page-title` lose
+`overflow-wrap: anywhere`.
+
+### axe-core (4.14.0, exact) — zero violations
+
+`src/App.a11y.test.tsx` runs axe on the whole page in seven states: the list page (with an overdue,
+a done and an Urdu task), the task page, the task page with the edit form open, Page not found, the
+error state (server off), the empty state and the open delete dialog. **Zero violations** in all
+seven, on the first run, so there was nothing to fix. Because a checker that finds nothing proves
+little, an eighth test renders a button with no name and checks that axe reports `button-name`.
+`color-contrast` is switched off in these tests only: jsdom applies no CSS, so axe cannot measure
+it. Contrast is covered by the token test above.
+
+### Checked in a real browser (headless Edge, production build + json-server)
+
+A small script drove Edge over the DevTools protocol. At every width it measured the page, the
+long-title task's page and its open delete dialog:
+
+| Width                    | Page wider than screen | Elements past the edge | Targets under 44 px | Dialog inside the screen, title not cut |
+| ------------------------ | ---------------------- | ---------------------- | ------------------- | --------------------------------------- |
+| 320, 375                 | no                     | 0                      | 0                   | yes (16 px from each edge)              |
+| 640, 720 (= 200% zoom\*) | no                     | 0                      | 0                   | yes                                     |
+| 768, 1024, 1440          | no                     | 0                      | 0                   | yes                                     |
+
+\* 200% zoom on a 1280 px or 1440 px window lays the page out at 640 or 720 CSS px, and all
+breakpoints are in rem, so these two widths are what a zoomed laptop shows.
+
+In the same run the dialog was a real modal (`:modal`), focus started on Cancel, Escape closed it
+and focus came back to Delete. With reduced motion the button transition was `1e-05s` and scrolling
+`auto` (without it: `0.12s` and `smooth`). The focus ring after Tab was a 3px solid outline in the
+dark theme's focus colour. I looked at the screenshots at 320, 375 (light and dark), 768 and 1440 px.
+
+### Choices I made, and why
+
+| Choice                                               | Why                                                                                                                                                            |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A dialog AND the Undo bar**                        | The dialog stops a slip of the finger (Delete sits next to Edit on a phone). Undo still covers "I meant it, but changed my mind". Day 12 had only Undo.        |
+| **Native `<dialog>` + `showModal()`**                | The browser traps focus, makes the page behind inert, handles Escape and draws `::backdrop`. A home-made modal would have to rebuild all of that.              |
+| **Focus starts on Cancel**                           | Enter or Space right after opening must never delete. Cancel is also first in the DOM, so the tab order matches the screen.                                    |
+| **The parent renders the dialog only while it asks** | It always opens fresh, with focus on Cancel, and closing it is just "stop rendering it". The cleanup calls `close()`.                                          |
+| **First answer wins** (a ref in the dialog)          | A double click on Delete, or Escape right after it, cannot answer twice. The one-request-per-task guard from Day 13 is a second safety net.                    |
+| **`<bdi>` around the title** in the question         | An Urdu title is right-to-left inside an English sentence; `<bdi>` keeps the quotes and the "?" in the right place.                                            |
+| **Tokens with the same names in both themes**        | Components never ask "dark or light?"; the media query swaps the values. Adding a theme switch later only needs a class that sets the same variables.          |
+| **rem breakpoints (40rem, 64rem)**                   | They follow the text size and zoom: at 200% zoom a laptop gets the phone layout, which is what fits.                                                           |
+| **`aria-disabled` look in CSS**                      | From Day 13: busy controls keep focus, so the "disabled" look (opacity 0.55, not-allowed cursor) comes from CSS, for both `aria-disabled` and real `disabled`. |
+| **The inline "Show all" / "Clear filters" links**    | Vertical padding makes them 44 px tall without changing how the sentence looks.                                                                                |
+
+**Known limits (Day 15, part A)**
+
+- jsdom has no `showModal()`. The tests use a small stand-in (`src/test/setup.ts`) that only sets
+  `open` and fires `close`. Focus trapping and the inert page behind the dialog come from the
+  browser and were checked in Edge, not in the unit tests.
+- The theme follows the system setting only; there is no switch in the app yet.
+- Contrast is checked on token pairs, not on every rendered element. A new pair (a new colour on a
+  new background) must be added to the list in `styles.test.ts`.
 
 ## Day 14: filters, a task page and a `useTasks` hook (React Router)
 
@@ -519,39 +642,60 @@ Tests in `src/keys.test.tsx`:
 
 ## Tests
 
-**276 tests in 22 files** (Day 13 had 227 in 18), run with Vitest + React Testing Library + jsdom.
+**356 tests in 26 files** (Day 14 had 276 in 22), run with Vitest + React Testing Library + jsdom.
 No test calls a real server: the network is replaced with `vi.spyOn(globalThis, 'fetch')`, either
 directly or through `src/test/fakeServer.ts`, a small in-memory json-server (same 404 and
 duplicate-id 500 answers as the real one) that can also fail, hang or hold a request. Since Day 14
 the App renders inside a `MemoryRouter` (`renderApp(tasks, { route: '/?status=done' })`).
 
-| File                                  | Tests | What it checks                                                                                                                                                                           |
-| ------------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/utils/tasks.test.ts`             | 33    | sorting, summary and "Showing X of Y" texts, addTask, updateTask, deleteTask, restoreTask, setDone (frozen arrays), validateTask, countChars, makeId                                     |
-| `src/api/tasks.test.ts`               | 26    | every API function: ok, 404, 500 (body cancelled), server off, 8 s timeout, non-JSON, bad items skipped, duplicate ids, PATCH body, caller abort                                         |
-| `src/components/TaskForm.test.tsx`    | 24    | labels, trimming, required title, counters, emoji, 100/500 limits, invalid and half-typed dates, warnings, double click, edit mode, Escape                                               |
-| `src/App.save.test.tsx`               | 20    | "Saving…", failed add/edit keep the text, PATCH only changed fields, optimistic done/delete + rollback, Undo with the same id, 404, double clicks                                        |
-| `src/utils/filters.test.ts`           | 20    | **Day 14.** URL reading (case, unknown, empty, repeats, 100 chars, emoji not split), writing (defaults left out), round trip, spaces/case/Urdu, `c++` `(` `.*` `[` as plain text, counts |
-| `src/App.routes.test.tsx`             | 19    | **Day 14.** the three routes, tab titles, `<h1>` focus, loading vs not found, load error, odd ids, trailing slash, done/delete/404 on the task page                                      |
-| `src/utils/dates.test.ts`             | 17    | formatting, null, invalid dates, leap years, local today, addDays, overdue / today with a fake today                                                                                     |
-| `src/App.filters.test.tsx`            | 15    | **Day 14.** counts + aria-pressed, priority, search, Urdu, push vs replace history, bad URL, Clear filters focus, every hidden-by-filter message, Show all, Back to tasks                |
-| `scripts/seed.test.mjs`               | 14    | the seed: 6 to 8 tasks, unique ids, valid dates, edge cases present, local date, broken seed                                                                                             |
-| `src/App.edit.test.tsx`               | 14    | the task page's form: prefilled, focus, Save, Escape/Cancel, empty title blocked, unsaved-changes bar on in-app links, no `window.confirm`                                               |
-| `src/App.load.test.tsx`               | 14    | loading → ready, error → Try again, empty list, StrictMode double effect, abort on unmount, timeout, non-JSON, bad items warning                                                         |
-| `src/components/TaskItem.test.tsx`    | 13    | text status/priority, overdue, due today, link + Edit link, dir, Edit/Delete/checkbox names, row layout                                                                                  |
-| `src/App.delete.test.tsx`             | 12    | delete + announce, focus next/previous/heading, Undo position, 5 s timer, pause on hover and focus, latest only, Delete on the task page, no timer leak                                  |
-| `src/App.add.test.tsx`                | 7     | add + trim + focus + announce, Enter, spaces-only title, double click, empty state goes away, duplicate allowed, header note                                                             |
-| `src/App.done.test.tsx`               | 6     | summary live, Space, sort after tick, ticked under "Pending" leaves with a message + focus, last one → heading, lost update                                                              |
-| `src/utils/pageTitle.test.ts`         | 5     | **Day 14.** "Tasks", task titles, the 50-character cut with "…"                                                                                                                          |
-| `src/App.test.tsx`                    | 4     | empty list, sort order, each task is a link, keyboard Tab + Enter                                                                                                                        |
-| `src/components/TaskSummary.test.tsx` | 4     | 0 tasks, 1 of 1, some done, all done                                                                                                                                                     |
-| `src/components/TaskDetail.test.tsx`  | 3     | "No description" (empty and spaces only), full detail with line breaks                                                                                                                   |
-| `src/keys.test.tsx`                   | 2     | the keys demo (see "Why keys matter")                                                                                                                                                    |
-| `src/context/TasksContext.test.tsx`   | 2     | **Day 14.** one shared load for all pages; a clear error outside the provider                                                                                                            |
-| `src/utils/plural.test.ts`            | 2     | 0 / 1 / 2 and a custom plural                                                                                                                                                            |
+| File                                          | Tests | What it checks                                                                                                                                                                                                                      |
+| --------------------------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/styles/styles.test.ts`                   | 57    | **Day 15.** every CSS file found and read; no raw colours outside tokens.css; every `var()` defined; focus ring never removed; reduced motion; long titles wrap; 25 contrast pairs × 2 themes; the contrast formula itself          |
+| `src/utils/tasks.test.ts`                     | 33    | sorting, summary and "Showing X of Y" texts, addTask, updateTask, deleteTask, restoreTask, setDone (frozen arrays), validateTask, countChars, makeId                                                                                |
+| `src/api/tasks.test.ts`                       | 26    | every API function: ok, 404, 500 (body cancelled), server off, 8 s timeout, non-JSON, bad items skipped, duplicate ids, PATCH body, caller abort                                                                                    |
+| `src/components/TaskForm.test.tsx`            | 24    | labels, trimming, required title, counters, emoji, 100/500 limits, invalid and half-typed dates, warnings, double click, edit mode, Escape                                                                                          |
+| `src/App.save.test.tsx`                       | 20    | "Saving…", failed add/edit keep the text, PATCH only changed fields, optimistic done/delete + rollback, Undo with the same id, 404, double clicks                                                                                   |
+| `src/utils/filters.test.ts`                   | 20    | **Day 14.** URL reading (case, unknown, empty, repeats, 100 chars, emoji not split), writing (defaults left out), round trip, spaces/case/Urdu, `c++` `(` `.*` `[` as plain text, counts                                            |
+| `src/App.routes.test.tsx`                     | 19    | **Day 14.** the three routes, tab titles, `<h1>` focus, loading vs not found, load error, odd ids, trailing slash, done/delete/404 on the task page                                                                                 |
+| `src/utils/dates.test.ts`                     | 17    | formatting, null, invalid dates, leap years, local today, addDays, overdue / today with a fake today                                                                                                                                |
+| `src/App.filters.test.tsx`                    | 15    | **Day 14.** counts + aria-pressed, priority, search, Urdu, push vs replace history, bad URL, Clear filters focus, every hidden-by-filter message, Show all, Back to tasks                                                           |
+| `scripts/seed.test.mjs`                       | 14    | the seed: 6 to 8 tasks, unique ids, valid dates, edge cases present, local date, broken seed                                                                                                                                        |
+| `src/App.edit.test.tsx`                       | 14    | the task page's form: prefilled, focus, Save, Escape/Cancel, empty title blocked, unsaved-changes bar on in-app links, no `window.confirm`                                                                                          |
+| `src/App.load.test.tsx`                       | 14    | loading → ready, error → Try again, empty list, StrictMode double effect, abort on unmount, timeout, non-JSON, bad items warning                                                                                                    |
+| `src/App.dialog.test.tsx`                     | 11    | **Day 15.** the delete dialog: opens with the title and focus on Cancel; Cancel, Escape and backdrop change nothing and return focus; confirm keeps Undo; double click deletes once; busy task; long and Urdu titles; the task page |
+| `src/App.a11y.test.tsx`                       | 8     | **Day 15.** axe-core on 7 page states (zero violations) + a control test that axe does report a nameless button                                                                                                                     |
+| `src/components/ConfirmDeleteDialog.test.tsx` | 4     | **Day 15.** showModal + Cancel first; first answer wins; the browser's "cancel" event; closed when removed                                                                                                                          |
+| `src/components/TaskItem.test.tsx`            | 13    | text status/priority, overdue, due today, link + Edit link, dir, Edit/Delete/checkbox names, row layout                                                                                                                             |
+| `src/App.delete.test.tsx`                     | 12    | delete + announce, focus next/previous/heading, Undo position, 5 s timer, pause on hover and focus, latest only, Delete on the task page, no timer leak                                                                             |
+| `src/App.add.test.tsx`                        | 7     | add + trim + focus + announce, Enter, spaces-only title, double click, empty state goes away, duplicate allowed, header note                                                                                                        |
+| `src/App.done.test.tsx`                       | 6     | summary live, Space, sort after tick, ticked under "Pending" leaves with a message + focus, last one → heading, lost update                                                                                                         |
+| `src/utils/pageTitle.test.ts`                 | 5     | **Day 14.** "Tasks", task titles, the 50-character cut with "…"                                                                                                                                                                     |
+| `src/App.test.tsx`                            | 4     | empty list, sort order, each task is a link, keyboard Tab + Enter                                                                                                                                                                   |
+| `src/components/TaskSummary.test.tsx`         | 4     | 0 tasks, 1 of 1, some done, all done                                                                                                                                                                                                |
+| `src/components/TaskDetail.test.tsx`          | 3     | "No description" (empty and spaces only), full detail with line breaks                                                                                                                                                              |
+| `src/keys.test.tsx`                           | 2     | the keys demo (see "Why keys matter")                                                                                                                                                                                               |
+| `src/context/TasksContext.test.tsx`           | 2     | **Day 14.** one shared load for all pages; a clear error outside the provider                                                                                                                                                       |
+| `src/utils/plural.test.ts`                    | 2     | 0 / 1 / 2 and a custom plural                                                                                                                                                                                                       |
 
 Every date test uses a fake today (`2026-11-10`), so the tests never depend on the real date. The
 Undo tests use Vitest fake timers (see "What broke").
+
+**Old tests I changed on Day 15** (Delete now asks first):
+
+- 20 old tests click Delete and now also confirm in the dialog, through one new helper,
+  `deleteAndConfirm(user, 'Delete Task B')` in `src/test/renderApp.tsx`. What they check did not
+  change: all 12 tests in `App.delete.test.tsx`; in `App.save.test.tsx` "a failed delete puts the
+  task back", "Undo re-creates … the SAME id", "Undo waits while the DELETE is still running", "if
+  Undo fails it says so" and "404 on delete"; `App.filters.test.tsx` "Undo of a task the filters
+  now hide says so"; `App.load.test.tsx` "reload keeps the changes"; `App.routes.test.tsx` "a 404 on
+  Delete from the detail page".
+- `App.delete.test.tsx`: "deletes without a confirm dialog, shows the Undo bar…" was renamed to
+  "deletes after the dialog (never window.confirm), shows the Undo bar…": it still checks that
+  `window.confirm` is never called.
+- `App.save.test.tsx` "Delete does nothing while saving" still clicks Delete directly: on a busy task
+  no dialog opens.
+- `src/test/renderApp.tsx`: `waitForLoad()` now also waits until the tab title is no longer
+  "Loading…" (see "What broke on Day 15").
 
 **Old tests I changed on Day 14** (the side panel became a page, the toggle became filters):
 
@@ -604,17 +748,53 @@ Undo tests use Vitest fake timers (see "What broke").
 
 **Do the tests really catch bugs?** I broke the code on purpose and put it back each time:
 
-| What I broke                                                      | Tests that failed                |
-| ----------------------------------------------------------------- | -------------------------------- |
-| `toggleDone` changes the old task object                          | 1                                |
-| The double-click guard switched off                               | 1                                |
-| The unsaved-changes check switched off                            | 5                                |
-| The Undo timer never pauses                                       | 2                                |
-| The Undo timer is not cleared (no `clearTimeout`)                 | 4                                |
-| Save writes back a copy taken when Edit was clicked (lost update) | 2                                |
-| The edit form gets a fixed key instead of `key={task.id}`         | 2                                |
-| **Day 13:** the one-request-per-task guard on "done" switched off | 1 (2 PATCHes instead of 1)       |
-| **Day 14:** the search built with `new RegExp(needle)`            | 2 ("Nothing to repeat" on `c++`) |
+| What I broke                                                      | Tests that failed                               |
+| ----------------------------------------------------------------- | ----------------------------------------------- |
+| `toggleDone` changes the old task object                          | 1                                               |
+| The double-click guard switched off                               | 1                                               |
+| The unsaved-changes check switched off                            | 5                                               |
+| The Undo timer never pauses                                       | 2                                               |
+| The Undo timer is not cleared (no `clearTimeout`)                 | 4                                               |
+| Save writes back a copy taken when Edit was clicked (lost update) | 2                                               |
+| The edit form gets a fixed key instead of `key={task.id}`         | 2                                               |
+| **Day 13:** the one-request-per-task guard on "done" switched off | 1 (2 PATCHes instead of 1)                      |
+| **Day 14:** the search built with `new RegExp(needle)`            | 2 ("Nothing to repeat" on `c++`)                |
+| **Day 15:** the dialog's "first answer wins" guard removed        | 0 at first, then 1 (see "What broke on Day 15") |
+| **Day 15:** `--color-text-muted` (light) set to a pale grey       | 2 (both contrast pairs with it)                 |
+| **Day 15:** a `color: #ff0000` added to `layout.css`              | 1 (no raw colours)                              |
+
+## What broke on Day 15
+
+Real problems and surprises from Day 15 (part A):
+
+1. **jsdom has no `<dialog>` API.** `showModal` is not a function there, so every dialog test
+   crashed at first. `src/test/setup.ts` adds a small stand-in that only sets `open` and fires
+   `close`. Focus trapping and the inert page are the browser's job, so I checked those in Edge.
+2. **The double-click test passed with the guard switched off.** After the first click the parent
+   stops rendering the dialog, so the second click lands on nothing. The test was right about the
+   app, but it did not test the dialog's own guard. I added `ConfirmDeleteDialog.test.tsx`, where
+   the parent keeps the dialog on screen: with the guard off it fails (2 confirms instead of 1).
+3. **One commit had a type error, and my check did not see it.** The CSS test first used `node:fs`,
+   but the app's tsconfig has no Node types. I ran `tsc -b | head`, and the pipe hid tsc's exit
+   code, so the commit went through. I fixed it before the next commit and amended that local,
+   unpushed commit.
+4. **The fix made the CSS test pass with nothing to check.** Reading the CSS with Vite's `?raw`
+   gave **empty strings**: Vitest blanks CSS files unless `test.css.include` matches them. The
+   "no raw colours" test passed on empty text while 53 others failed. Now `vite.config.ts` lets CSS
+   through in tests, and a first test checks that all five CSS files are found and not empty. To
+   prove it, I added `color: #ff0000` to `layout.css`: 1 test failed, then I removed it.
+5. **`import.meta.glob('../**/*.css')` gave mixed keys** (`../index.css` but `./tokens.css`), so
+   my path matching missed files. A root-relative pattern (`/src/**/*.css`) gives one form.
+6. **"←Back to tasks" lost its space.** Making the link `inline-flex` (for the 44 px height) drops
+   the trailing space inside the arrow's `<span>`. I only saw it in the screenshot; a `gap` fixed it.
+7. **All my first screenshots were dark.** This PC is set to dark mode, so headless Edge used the
+   dark theme even without emulating it. I forced `prefers-color-scheme: light` for the light ones.
+8. **A Day 14 test failed once in the full run** ("expected 'Loading task… | Tasks' to be 'Task not
+   found | Tasks'"), then once in 3 runs of that file alone, then 0 times in 8 runs on `main` and 8
+   on this branch. The tab title is set in an effect, which can run a moment after the DOM shows
+   the page, and `waitForLoad()` only waited for the DOM. It now waits for the title too.
+9. **axe found zero violations on the first run.** That made me suspicious, so I added a control
+   test with a nameless button: axe reports `button-name`, so the setup really checks.
 
 ## What broke on Day 14
 
@@ -746,5 +926,5 @@ Real problems and surprises from building Day 11:
 
 ## Tech
 
-React 19, TypeScript 7 (strict), Vite 8, oxlint, Prettier, Vitest 5, React Testing Library, jsdom,
+React 19, TypeScript 7 (strict), Vite 8, plain CSS with custom properties, axe-core 4.14.0, oxlint, Prettier, Vitest 5, React Testing Library, jsdom,
 json-server 0.17.4 (mock API), concurrently.

@@ -233,3 +233,7 @@ export function toPaisa(amount: number): number {
 5. **`src/config.ts`** holds every setting in one object.
 6. **`tests/`** mirrors that split: logic, CSV, storage, and one file that runs the real CLI.
 7. **Tooling**: `npm run check` runs typecheck, lint, format check and 62 tests in one go.
+
+## Known limits
+
+- If two runs both find the lock stale at the same moment, one may remove the other's fresh lock. This window is very small and only happens after a crash left an old lock.

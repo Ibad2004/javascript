@@ -60,13 +60,16 @@ Keep the PR small: one topic, one commit per feature. A 3-commit PR gets a caref
 
 **"What would you change after the review?"**
 
-The instructor has not reviewed this PR yet. This section will be updated after the review with each
-comment, whether it was must-fix or a nitpick, and the commit that fixed it.
+The Week 2 review asked for these changes. They are on the `review-fixes` branch, one commit per day:
 
-What I would check first myself:
+| Review point | What I would change (and did) | Commit |
+| --- | --- | --- |
+| Edge cases | Day 5: a debounced function that throws from a timer cannot be caught by the caller (documented). Day 6 and 8: `Retry-After` for 503 too, as seconds or an HTTP date, plus jitter. Day 7: no weapon, negative damage, no target and missing config no longer crash. Day 9: new lines and control characters in a description are rejected, and amounts are stored as whole paisa. | `bf7d7e8`, `67f1f6e`, `a9676d2`, `670baee`, `329e440` |
+| Time zones (my old `total --month` note) | Dates and months are now shown in local time, not UTC, with a test near midnight. | `329e440` |
+| Concurrency (my old `export` race note) | Day 9 changes go through a lock file (`wx`, stale after 10 s), and a test runs 8 adds at the same time and keeps all 8. `export` still checks the file and then writes it, so that small gap is not fixed. | `329e440` |
+| Closing old comments | Each earlier review comment gets its own fix commit, so a comment can be closed by pointing to it. The Week 1 fixes are `5d9d5ac` to `c3a0635`. | `5d9d5ac`..`c3a0635` |
+| Repo tidiness | Generated `output/` files of Day 6 and Day 8 are no longer tracked and are in `.gitignore`; the Day 9 lock file is ignored too. | `67f1f6e`, `a9676d2`, `329e440` |
+| Day labels | Day 6 and Day 8 READMEs say that Day 6 is the frozen original and Day 8 moved on. | `a9676d2` |
 
-- `edit` treats any value starting with `--` as a missing value, so a description can't start with `--`.
-- `total --month` uses the UTC month, so an expense added at 1 a.m. in Pakistan (UTC+5) on 1 December counts
-  in November.
-- `export` checks that the file exists and then writes it, so another program could create the file between
-  the check and the write.
+Still open from my own list: `edit` treats any value starting with `--` as a missing value, so a
+description cannot start with `--`.

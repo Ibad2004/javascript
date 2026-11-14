@@ -20,13 +20,13 @@ const totals = allScores.reduce((result, { player, points }) => {
 
 const board = Object.entries(totals)
   .map(([player, total]) => ({ player, total }))
-  .sort((a, b) => b.total - a.total);
+  .sort((a, b) => b.total - a.total || a.player.localeCompare(b.player));
 
 board.forEach(({ player, total }, index) => {
   console.log(`${index + 1}. ${player.padEnd(5)} ${total}`);
 });
 
 const [champion, runnerUp, ...rest] = board;
-console.log(`Champion: ${champion.player}`);
-console.log(`Runner-up: ${runnerUp.player}`);
+console.log(`Champion: ${champion ? champion.player : "none"}`);
+console.log(`Runner-up: ${runnerUp ? runnerUp.player : "none"}`);
 console.log(`Others: ${rest.map(({ player }) => player).join(", ")}`);

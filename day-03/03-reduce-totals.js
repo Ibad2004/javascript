@@ -16,11 +16,12 @@ const byCategory = cart.reduce((result, item) => {
   return result;
 }, {});
 
-const mostExpensive = cart.reduce((best, item) =>
-  item.price > best.price ? item : best
-);
+const mostExpensive =
+  cart.length === 0
+    ? null
+    : cart.reduce((best, item) => (item.price > best.price ? item : best));
 
 console.log("Total:", total);
 console.log("Items:", itemCount);
 console.log("By category:", byCategory);
-console.log("Most expensive:", mostExpensive.name);
+console.log("Most expensive:", (mostExpensive ? mostExpensive.name : "none"));

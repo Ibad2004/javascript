@@ -9,9 +9,10 @@ const names = products.map((p) => p.name.toUpperCase());
 const withTax = products.map((p) => ({
   name: p.name,
   price: p.price,
-  priceWithTax: p.price * 1.17,
+  priceWithTaxPaisa: Math.round(p.price * 100 * 1.17),
 }));
 
+// Money is kept in integer paisa (1 Rs = 100 paisa) and rounded once, at the end.
 const labels = products.map((p, index) => `${index + 1}. ${p.name} - Rs ${p.price}`);
 
 console.log(names);

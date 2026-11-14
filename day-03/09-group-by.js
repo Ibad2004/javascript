@@ -11,12 +11,14 @@ const getGrade = (score) => {
   if (score >= 90) return "A";
   if (score >= 80) return "B";
   if (score >= 70) return "C";
+  if (score >= 60) return "D";
   return "F";
 };
 
 const byGrade = students.reduce((groups, { name, score }) => {
   const grade = getGrade(score);
-  groups[grade] = [...(groups[grade] || []), name];
+  if (!groups[grade]) groups[grade] = [];
+  groups[grade].push(name);
   return groups;
 }, {});
 

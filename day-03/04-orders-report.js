@@ -13,7 +13,7 @@ const revenue = delivered
   .map((o) => o.amount)
   .reduce((sum, amount) => sum + amount, 0);
 
-const average = revenue / delivered.length;
+const average = delivered.length === 0 ? 0 : revenue / delivered.length;
 
 const spentByCustomer = delivered.reduce((totals, o) => {
   totals[o.customer] = (totals[o.customer] || 0) + o.amount;

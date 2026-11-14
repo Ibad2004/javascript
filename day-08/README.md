@@ -5,7 +5,11 @@ Day 8 is my Day 6 script (fetch users and their posts with retry, build a summar
 same as Day 6. Converting it showed 3 real bugs in the Day 6 JavaScript (see
 [Bugs TypeScript caught](#bugs-typescript-caught)).
 
-`day-06/` was not changed. Day 8 is a converted copy.
+**Day 6 is the frozen original; Day 8 moved on.** `day-06/` is not the same as this folder any
+more: after the conversion, Day 8 (and Day 6, in its own review) got `Retry-After` for 429 and 503
+(seconds or an HTTP date), jitter on the backoff, and injectable `random` and `now`. Both folders
+have these changes now, but they are two separate copies, and further changes in Day 8 (TypeScript)
+are not copied back to Day 6. Day 8 is a converted copy that keeps growing.
 
 ## How to run
 
@@ -31,7 +35,7 @@ The 3 small demo scripts from Day 6 are also converted. After `npm run build` th
 | --- | --- |
 | `src/config.ts` | The one config object (base URL, retry numbers, output path), `readonly` with `as const` |
 | `src/guards.ts` | Small type guard helpers used everywhere: `isUnknownArray`, `isObject`, `messageOf` |
-| `src/fetch-with-retry.ts` | `fetchJsonWithRetry`: fetch + timeout + retry + backoff + Retry-After, with option checks |
+| `src/fetch-with-retry.ts` | `fetchJsonWithRetry`: fetch + timeout + retry + backoff + Retry-After, with option checks, Retry-After (429/503), jitter |
 | `src/summary.ts` | The data interfaces, `validateUsers` (unknown → `ApiUser[]`) and `buildSummary` |
 | `src/save-json.ts` | `saveJson`: writes a temp file, then renames it, so a half-written file is never left |
 | `src/main.ts` | The script: users → posts in parallel → summary → save. Exit code 0, 1 or 2 |
@@ -423,7 +427,8 @@ Same behaviour as Day 6, plus the 3 bug fixes. Every row has a test.
 | A thrown value that is not an `Error` (bug 1) | reason uses `String(value)` | "a thrown value that is not an Error still gives a readable reason" |
 | Timeout | reported as `timeout after N ms`, retried | "timeout then 200: a TimeoutError is reported as a timeout and retried" |
 | Backoff | 500, 1000, 2000, 4000, capped at `maxDelayMs` | "delays double each time: 500, 1000, 2000, 4000", "delays are capped at maxDelayMs" |
-| Retry-After on 429 | honoured, capped; bad values ignored; ignored on 503 | the 5 "429 and Retry-After" tests |
+| Retry-After on 429 and 503 | seconds or HTTP date honoured, capped; past date = 0; bad values use backoff; ignored on other statuses | the "429 and Retry-After" tests |
+| Jitter | half of the backoff fixed, half random; `random` is injectable; not applied to Retry-After; capped | the 6 "jitter" tests |
 | Bad options (`maxAttempts` 0 / 11 / 1.5 / `"3"` / `NaN`, bad url, non-function `fetchFn`, …) | `TypeError` / `RangeError` before any fetch | the 12 "option validation" tests |
 | Circular data, `undefined`, function, symbol, BigInt | `TypeError`, nothing written | "rejects circular data with a clear TypeError and writes nothing", "rejects undefined, a function, a symbol and a BigInt" |
 | Blank or non-string file path | `TypeError` | "rejects a blank file path", "rejects a file path that is not a string" |

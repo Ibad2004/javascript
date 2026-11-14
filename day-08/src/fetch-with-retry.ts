@@ -12,6 +12,8 @@ export interface RetryInfo {
 
 export type FetchFn = (url: string, init: { readonly signal: AbortSignal }) => Promise<Response>;
 export type SleepFn = (ms: number) => Promise<unknown>;
+export type RandomFn = () => number;
+export type NowFn = () => number;
 export type RetryListener = (info: RetryInfo) => void;
 
 export interface RetryOptions {
@@ -21,13 +23,15 @@ export interface RetryOptions {
   readonly maxDelayMs?: number;
   readonly fetchFn?: FetchFn;
   readonly sleep?: SleepFn;
+  readonly random?: RandomFn;
+  readonly now?: NowFn;
   readonly onRetry?: RetryListener;
 }
 
 export type Settings = Required<RetryOptions>;
 
 type NumberOption = "maxAttempts" | "timeoutMs" | "baseDelayMs" | "maxDelayMs";
-type FunctionOption = "fetchFn" | "sleep" | "onRetry";
+type FunctionOption = "fetchFn" | "sleep" | "random" | "now" | "onRetry";
 
 const RETRYABLE_STATUSES = [408, 429, 500, 502, 503, 504] as const;
 type RetryableStatus = (typeof RETRYABLE_STATUSES)[number];
@@ -73,6 +77,8 @@ const functionError = (name: FunctionOption, value: unknown): TypeError =>
 
 const isFetchFn = (value: unknown): value is FetchFn => typeof value === "function";
 const isSleepFn = (value: unknown): value is SleepFn => typeof value === "function";
+const isRandomFn = (value: unknown): value is RandomFn => typeof value === "function";
+const isNowFn = (value: unknown): value is NowFn => typeof value === "function";
 const isRetryListener = (value: unknown): value is RetryListener => typeof value === "function";
 
 const orDefault = (value: unknown, fallback: unknown): unknown => (value === undefined ? fallback : value);
@@ -85,6 +91,8 @@ function rawOptions(options: object) {
     maxDelayMs: "maxDelayMs" in options ? options.maxDelayMs : undefined,
     fetchFn: "fetchFn" in options ? options.fetchFn : undefined,
     sleep: "sleep" in options ? options.sleep : undefined,
+    random: "random" in options ? options.random : undefined,
+    now: "now" in options ? options.now : undefined,
     onRetry: "onRetry" in options ? options.onRetry : undefined,
   };
 }
@@ -104,9 +112,13 @@ function resolveFunctions(raw: RawOptions) {
   if (!isFetchFn(fetchFn)) throw functionError("fetchFn", fetchFn);
   const sleep = orDefault(raw.sleep, delay);
   if (!isSleepFn(sleep)) throw functionError("sleep", sleep);
+  const random = orDefault(raw.random, Math.random);
+  if (!isRandomFn(random)) throw functionError("random", random);
+  const now = orDefault(raw.now, Date.now);
+  if (!isNowFn(now)) throw functionError("now", now);
   const onRetry = orDefault(raw.onRetry, () => {});
   if (!isRetryListener(onRetry)) throw functionError("onRetry", onRetry);
-  return { fetchFn, sleep, onRetry };
+  return { fetchFn, sleep, random, now, onRetry };
 }
 
 export function resolveOptions(url: unknown, options: unknown): Settings {
@@ -138,13 +150,22 @@ export class RequestError extends Error {
   }
 }
 
-function parseRetryAfterMs(headerValue: string | null): number | null {
-  if (headerValue === null || !/^\d+$/.test(headerValue.trim())) return null;
-  return Number(headerValue.trim()) * 1000;
+export function parseRetryAfterMs(headerValue: string | null, now: number): number | null {
+  if (headerValue === null) return null;
+  const value = headerValue.trim();
+  if (/^\d+$/.test(value)) return Number(value) * 1000;
+  if (!/[a-z]/i.test(value)) return null;
+  const date = Date.parse(value);
+  if (Number.isNaN(date)) return null;
+  return Math.max(0, date - now);
 }
 
-function httpError(response: Response): RequestError {
-  const retryAfterMs = response.status === 429 ? parseRetryAfterMs(response.headers.get("retry-after")) : null;
+const hasRetryAfter = (status: number): boolean => status === 429 || status === 503;
+
+function httpError(response: Response, now: number): RequestError {
+  const retryAfterMs = hasRetryAfter(response.status)
+    ? parseRetryAfterMs(response.headers.get("retry-after"), now)
+    : null;
   return new RequestError(`HTTP ${response.status}`, {
     retryable: isRetryableStatus(response.status),
     status: response.status,
@@ -170,7 +191,7 @@ function parseJson(text: string): unknown {
   }
 }
 
-async function requestText(url: string, { timeoutMs, fetchFn }: Settings): Promise<string> {
+async function requestText(url: string, { timeoutMs, fetchFn, now }: Settings): Promise<string> {
   let response: Response;
   try {
     response = await fetchFn(url, { signal: AbortSignal.timeout(timeoutMs) });
@@ -178,13 +199,19 @@ async function requestText(url: string, { timeoutMs, fetchFn }: Settings): Promi
   } catch (error) {
     throw networkError(error, timeoutMs);
   }
-  throw httpError(response);
+  throw httpError(response, now());
 }
 
 const attemptOnce = async (url: string, settings: Settings): Promise<unknown> =>
   parseJson(await requestText(url, settings));
 
-const backoffDelay = (attempt: number, { baseDelayMs }: Settings): number => baseDelayMs * 2 ** (attempt - 1);
+// "Equal jitter": half of the backoff is fixed, the other half is random (random() is 0 to 1).
+function backoffDelay(attempt: number, { baseDelayMs, random }: Settings): number {
+  const full = baseDelayMs * 2 ** (attempt - 1);
+  const factor = random();
+  const safeFactor = Number.isFinite(factor) ? Math.min(1, Math.max(0, factor)) : 1;
+  return Math.round(full / 2 + (full / 2) * safeFactor);
+}
 
 const retryDelay = (error: RequestError, attempt: number, settings: Settings): number =>
   Math.min(error.retryAfterMs ?? backoffDelay(attempt, settings), settings.maxDelayMs);

@@ -1,10 +1,11 @@
+import "./set-tz.js";
 import assert from "node:assert/strict";
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, test } from "node:test";
-import { loadStore, parseStore, saveStore, writeExport } from "../src/storage.js";
+import { loadStore, lockPathFor, parseStore, saveStore, withLock, writeExport } from "../src/storage.js";
 
 let dir = "";
 
@@ -83,5 +84,96 @@ describe("writeExport", () => {
     assert.deepEqual(await writeExport(file, "new", true), { ok: true, value: file });
     assert.equal(await readFile(file, "utf8"), "new");
     assert.deepEqual(await readdir(dir), ["expenses.csv"]);
+  });
+});
+
+describe("integer paisa in the file", () => {
+  const base = { id: 1, description: "A", category: "x", date: "2026-11-05T10:00:00.000Z" };
+
+  test("a new file with amountPaisa loads as it is", () => {
+    const result = parseStore({ nextId: 2, expenses: [{ ...base, amountPaisa: 1999 }] });
+    assert.ok(result.ok);
+    assert.equal(result.value.expenses[0]?.amountPaisa, 1999);
+  });
+
+  test("an old file with a decimal amount still loads and is converted", () => {
+    const result = parseStore({
+      nextId: 3,
+      expenses: [
+        { ...base, amount: 19.99 },
+        { ...base, id: 2, amount: 450 },
+      ],
+    });
+    assert.ok(result.ok);
+    assert.deepEqual(
+      result.value.expenses.map((expense) => expense.amountPaisa),
+      [1999, 45000],
+    );
+  });
+
+  test("bad paisa values are rejected with a clear message", () => {
+    for (const amountPaisa of [0, -5, 1.5, "100", Number.NaN, 1e12]) {
+      const result = parseStore({ nextId: 2, expenses: [{ ...base, amountPaisa }] });
+      assert.ok(!result.ok && result.error.includes("expenses[0].amountPaisa"), String(amountPaisa));
+    }
+    const none = parseStore({ nextId: 2, expenses: [base] });
+    assert.ok(!none.ok && none.error.includes("expenses[0].amount"));
+  });
+
+  test("saving an old file writes amountPaisa and no decimal amount", async () => {
+    const file = join(dir, "old.json");
+    await writeFile(file, JSON.stringify({ nextId: 2, expenses: [{ ...base, amount: 19.99 }] }));
+    const loaded = await loadStore(file);
+    assert.ok(loaded.ok);
+    await saveStore(file, loaded.value);
+    const text = await readFile(file, "utf8");
+    assert.ok(text.includes('"amountPaisa": 1999'));
+    assert.ok(!/"amount":/.test(text));
+  });
+});
+
+describe("withLock", () => {
+  test("creates the lock while running and removes it afterwards", async () => {
+    const file = join(dir, "data", "expenses.json");
+    await withLock(file, async () => {
+      assert.ok((await readdir(join(dir, "data"))).includes("expenses.json.lock"));
+    });
+    assert.deepEqual(await readdir(join(dir, "data")), []);
+  });
+
+  test("removes the lock even when the action throws", async () => {
+    const file = join(dir, "expenses.json");
+    await assert.rejects(
+      withLock(file, () => Promise.reject(new Error("boom"))),
+      /boom/,
+    );
+    assert.deepEqual(await readdir(dir), []);
+  });
+
+  test("a second caller waits for a fresh lock, then gives up with a clear error", async () => {
+    const file = join(dir, "expenses.json");
+    await writeFile(lockPathFor(file), "123");
+    await assert.rejects(
+      withLock(file, () => Promise.resolve(1), { waitMs: 100 }),
+      /Could not lock/,
+    );
+    assert.ok((await readdir(dir)).includes("expenses.json.lock"));
+  });
+
+  test("a lock older than 10 seconds is stale and is taken over", async () => {
+    const file = join(dir, "expenses.json");
+    const lock = lockPathFor(file);
+    await writeFile(lock, "123");
+    const old = new Date(Date.now() - 11_000);
+    await utimes(lock, old, old);
+    assert.equal(await withLock(file, () => Promise.resolve("ran")), "ran");
+    assert.deepEqual(await readdir(dir), []);
+  });
+
+  test("a lock that is released while waiting lets the second caller in", async () => {
+    const file = join(dir, "expenses.json");
+    await writeFile(lockPathFor(file), "123");
+    setTimeout(() => void rm(lockPathFor(file), { force: true }), 80);
+    assert.equal(await withLock(file, () => Promise.resolve("ran")), "ran");
   });
 });

@@ -2,7 +2,7 @@ import { config } from "./config.js";
 
 export interface Expense {
   id: number;
-  amount: number;
+  amountPaisa: number;
   description: string;
   category: string;
   date: string;
@@ -27,6 +27,8 @@ export interface Totals {
 
 const amountPattern = /^-?\d+(\.\d+)?$/;
 const idPattern = /^\d+$/;
+// C0/C1 control characters (new lines, tabs, ...) and the Unicode line/paragraph separators
+const controlPattern = /[\p{Cc}\p{Zl}\p{Zp}]/u;
 
 export function emptyStore(): Store {
   return { nextId: 1, expenses: [] };
@@ -70,6 +72,13 @@ export function parseDescription(input: string | undefined): Result<string> {
   if (text === "") {
     return { ok: false, error: "Description is required." };
   }
+  if (controlPattern.test(text)) {
+    return {
+      ok: false,
+      error:
+        "Description cannot contain new lines, tabs or other control characters. Use one line of plain text.",
+    };
+  }
   return { ok: true, value: text };
 }
 
@@ -108,7 +117,7 @@ export function addExpense(
   const id = Math.max(store.nextId, highestId + 1);
   const expense: Expense = {
     id,
-    amount: amount.value,
+    amountPaisa: toPaisa(amount.value),
     description: description.value,
     category: parseCategory(categoryInput),
     date: now.toISOString(),
@@ -117,7 +126,7 @@ export function addExpense(
 }
 
 export function describeExpense(expense: Expense): string {
-  return `#${expense.id}: ${formatPaisa(toPaisa(expense.amount))} ${expense.description} (${expense.category})`;
+  return `#${expense.id}: ${formatPaisa(expense.amountPaisa)} ${expense.description} (${expense.category})`;
 }
 
 export interface ExpenseChanges {
@@ -148,7 +157,7 @@ export function editExpense(
     if (!amount.ok) {
       return amount;
     }
-    expense = { ...expense, amount: amount.value };
+    expense = { ...expense, amountPaisa: toPaisa(amount.value) };
   }
   if (changes.description !== undefined) {
     const description = parseDescription(changes.description);
@@ -211,19 +220,23 @@ export function parseMonth(input: string | undefined): Result<string> {
   return { ok: true, value: text };
 }
 
-export function isoDay(date: string): string {
-  return new Date(date).toISOString().slice(0, 10);
+// The day (YYYY-MM-DD) in the computer's LOCAL time zone, not UTC.
+export function localDay(date: string): string {
+  const parsed = new Date(date);
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${String(parsed.getFullYear()).padStart(4, "0")}-${month}-${day}`;
 }
 
 export function filterByMonth(expenses: Expense[], month: string): Expense[] {
-  return expenses.filter((expense) => isoDay(expense.date).startsWith(`${month}-`));
+  return expenses.filter((expense) => localDay(expense.date).startsWith(`${month}-`));
 }
 
 export function computeTotals(expenses: Expense[]): Totals {
   const byCategory = new Map<string, number>();
   let paisa = 0;
   for (const expense of expenses) {
-    const value = toPaisa(expense.amount);
+    const value = expense.amountPaisa;
     paisa += value;
     byCategory.set(expense.category, (byCategory.get(expense.category) ?? 0) + value);
   }
@@ -240,9 +253,9 @@ export function formatTable(expenses: Expense[]): string {
   const header = ["ID", "DATE", "CATEGORY", "AMOUNT", "DESCRIPTION"];
   const rows = expenses.map((expense) => [
     String(expense.id),
-    isoDay(expense.date),
+    localDay(expense.date),
     expense.category,
-    formatPaisa(toPaisa(expense.amount)),
+    formatPaisa(expense.amountPaisa),
     expense.description,
   ]);
   const all = [header, ...rows];

@@ -28,7 +28,7 @@ All commands run from `day-09/`. `npm start` builds first (the `prestart` script
 - `edit` changes only the fields you give and keeps the id and date. It uses the same rules as `add`, but a
   blank `--category` is an error instead of falling back to `other`. Unknown options, a missing value and the
   same option twice are errors, and the data file is not changed.
-- `total --month` uses the month of the saved UTC date. A month with no expenses prints
+- `total --month` uses the month of the saved date **in local time**. A month with no expenses prints
   `No expenses in 2026-12` and `Total: 0.00`.
 - `export` writes `id,date,category,amount,description` with `\r\n` line endings. The path is relative to
   `day-09/` (where npm runs the script), and `*.csv` there is git-ignored. Values with commas, quotes or new
@@ -49,7 +49,7 @@ Commands:
                                           Change only the given fields of an expense
   list [category]                         Show expenses, optionally for one category
   total [--month YYYY-MM]                 Show the overall total and the total per category,
-                                          optionally for one month (UTC)
+                                          optionally for one month (local time)
   delete <id>                             Delete an expense by id
   export <file.csv> [--force]             Save all expenses as CSV (--force overwrites the file)
   help, --help, -h                        Show this help
@@ -219,7 +219,8 @@ export function toPaisa(amount: number): number {
 - TypeScript, ESLint and Prettier overlap very little: types, code problems and layout.
 - Validating loaded JSON is as important as validating CLI input; a bad file should stop the program, not be
   overwritten.
-- Whole-number paisa avoids floating-point money errors.
+- Whole-number paisa avoids floating-point money errors. The data file now stores `amountPaisa` (an integer); old files with a decimal `amount` still load and are rewritten on the next save.
+- Review fixes: a lock file (`expenses.json.lock`, created with `wx`, stale after 10 s) so parallel commands keep every expense; descriptions cannot contain new lines or control characters; days are shown in local time; commands are in a map instead of an `if` chain.
 
 ## For the status meeting
 

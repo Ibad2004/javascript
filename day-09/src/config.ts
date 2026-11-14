@@ -10,4 +10,8 @@ export const config = Object.freeze({
   monthPattern: /^\d{4}-(0[1-9]|1[0-2])$/,
   csvFormulaStarts: ["=", "+", "-", "@", "\t", "\r"],
   csvLineEnding: "\r\n",
+  lockSuffix: ".lock",
+  lockStaleMs: 10_000,
+  lockRetryMs: 20,
+  lockWaitMs: 5_000,
 });

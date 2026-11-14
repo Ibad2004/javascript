@@ -1,6 +1,7 @@
+import "./set-tz.js";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { execFile, spawnSync } from "node:child_process";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,6 +16,20 @@ function cli(...args: string[]): { code: number | null; stdout: string; stderr: 
     env: { ...process.env, EXPENSES_FILE: join(dir, "expenses.json") },
   });
   return { code: result.status, stdout: result.stdout, stderr: result.stderr };
+}
+
+function cliAsync(...args: string[]): Promise<{ code: number; stderr: string }> {
+  return new Promise((resolve) => {
+    execFile(
+      process.execPath,
+      [cliPath, ...args],
+      { encoding: "utf8", env: { ...process.env, EXPENSES_FILE: join(dir, "expenses.json") } },
+      (error, _stdout, stderr) => {
+        const code = error === null ? 0 : typeof error.code === "number" ? error.code : 1;
+        resolve({ code, stderr });
+      },
+    );
+  });
 }
 
 beforeEach(async () => {
@@ -162,4 +177,38 @@ test("export with a bad file name or option exits with code 1", () => {
     assert.equal(result.code, 1, args.join(" "));
     assert.match(result.stderr, message, args.join(" "));
   }
+});
+
+test("8 adds at the same time keep all 8 expenses", async () => {
+  const runs = Array.from({ length: 8 }, (_, index) =>
+    cliAsync("add", String(index + 1), `Item ${index + 1}`, "food"),
+  );
+  const results = await Promise.all(runs);
+  for (const result of results) {
+    assert.equal(result.code, 0, result.stderr);
+  }
+  const saved: unknown = JSON.parse(await readFile(join(dir, "expenses.json"), "utf8"));
+  assert.ok(
+    typeof saved === "object" && saved !== null && "expenses" in saved && Array.isArray(saved.expenses),
+  );
+  assert.equal(saved.expenses.length, 8);
+  const ids = saved.expenses.map((expense: unknown) =>
+    typeof expense === "object" && expense !== null && "id" in expense ? expense.id : undefined,
+  );
+  assert.deepEqual([...ids].sort(), [1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.deepEqual(await readdir(dir), ["expenses.json"]);
+});
+
+test("a description with a new line exits with code 1 and saves nothing", () => {
+  const result = cli("add", "5", "line one\nline two", "food");
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /cannot contain new lines/);
+  assert.equal(cli("list").stdout.trim(), "No expenses yet");
+});
+
+test("new expenses are saved as whole paisa", async () => {
+  assert.equal(cli("add", "19.99", "Tea", "food").code, 0);
+  const text = await readFile(join(dir, "expenses.json"), "utf8");
+  assert.match(text, /"amountPaisa": 1999/);
+  assert.ok(!/"amount":/.test(text));
 });

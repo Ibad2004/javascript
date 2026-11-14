@@ -1,3 +1,4 @@
+import "./set-tz.js";
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
@@ -6,6 +7,7 @@ import {
   deleteExpense,
   editExpense,
   filterByMonth,
+  localDay,
   emptyStore,
   filterByCategory,
   formatList,
@@ -180,13 +182,13 @@ describe("editExpense", () => {
     assert.ok(result.ok);
     assert.deepEqual(result.value.expense, {
       id: 2,
-      amount: 150,
+      amountPaisa: 15000,
       description: "Bus fare",
       category: "transport",
       date: "2026-11-05T10:00:00.000Z",
     });
     assert.deepEqual(result.value.store.expenses[0], base.expenses[0]);
-    assert.equal(base.expenses[1]?.amount, 120.5);
+    assert.equal(base.expenses[1]?.amountPaisa, 12050);
   });
 
   test("trims and lowercases a new category and trims a new description", () => {
@@ -266,5 +268,94 @@ describe("monthly total", () => {
     const text = formatTotals(totals, "No expenses in 2026-12");
     assert.equal(text, "No expenses in 2026-12\nTotal: 0.00");
     assert.ok(!text.includes("NaN"));
+  });
+});
+
+describe("description control characters", () => {
+  test("rejects new lines, tabs and other control characters with a clear message", () => {
+    for (const text of ["a\nb", "a\r\nb", "a\tb", "a\u0000b", "a\u2028b", "a\u0085b"]) {
+      const result = addExpense(emptyStore(), "5", text, "food", now);
+      assert.ok(!result.ok, JSON.stringify(text));
+      assert.match(result.error, /cannot contain new lines, tabs or other control characters/);
+    }
+  });
+
+  test("edit rejects them too, and plain text with spaces and unicode is fine", () => {
+    const base = storeWith(["10", "Tea", "food"]);
+    assert.equal(editExpense(base, "1", { description: "x\ny" }).ok, false);
+    assert.equal(addExpense(emptyStore(), "5", "Chai \u2615 with milk", "food", now).ok, true);
+  });
+});
+
+describe("dates in local time", () => {
+  function withZone<T>(zone: string, action: () => T): T {
+    const before = process.env["TZ"];
+    process.env["TZ"] = zone;
+    try {
+      return action();
+    } finally {
+      process.env["TZ"] = before;
+    }
+  }
+
+  test("20:30 UTC is already the next day in Pakistan (UTC+5)", () => {
+    const store = withZone("Asia/Karachi", () => {
+      const result = addExpense(emptyStore(), "5", "Late tea", "food", new Date("2026-11-05T20:30:00.000Z"));
+      assert.ok(result.ok);
+      return result.value.store;
+    });
+    assert.match(
+      withZone("Asia/Karachi", () => formatTable(store.expenses)),
+      /2026-11-06/,
+    );
+    assert.match(
+      withZone("UTC", () => formatTable(store.expenses)),
+      /2026-11-05/,
+    );
+  });
+
+  test("a month total uses local days: 23:30 on Nov 30 UTC is December in Pakistan", () => {
+    const store = withZone("UTC", () => {
+      const result = addExpense(emptyStore(), "5", "Late tea", "food", new Date("2026-11-30T23:30:00.000Z"));
+      assert.ok(result.ok);
+      return result.value.store;
+    });
+    assert.equal(
+      withZone("UTC", () => filterByMonth(store.expenses, "2026-11").length),
+      1,
+    );
+    assert.equal(
+      withZone("Asia/Karachi", () => filterByMonth(store.expenses, "2026-11").length),
+      0,
+    );
+    assert.equal(
+      withZone("Asia/Karachi", () => filterByMonth(store.expenses, "2026-12").length),
+      1,
+    );
+  });
+
+  test("just before and just after local midnight are different days", () => {
+    withZone("America/New_York", () => {
+      const before = new Date(2026, 10, 5, 23, 59, 59).toISOString();
+      const after = new Date(2026, 10, 6, 0, 0, 1).toISOString();
+      assert.equal(localDay(before), "2026-11-05");
+      assert.equal(localDay(after), "2026-11-06");
+    });
+  });
+});
+
+describe("integer paisa", () => {
+  test("amounts are stored as whole paisa, so cents do not drift", () => {
+    let store = emptyStore();
+    for (const amount of ["0.10", "0.20", "19.99", "1.005".slice(0, 4)]) {
+      const result = addExpense(store, amount, "x", "food", now);
+      assert.ok(result.ok);
+      store = result.value.store;
+    }
+    assert.deepEqual(
+      store.expenses.map((expense) => expense.amountPaisa),
+      [10, 20, 1999, 100],
+    );
+    assert.equal(computeTotals(store.expenses).paisa, 2129);
   });
 });

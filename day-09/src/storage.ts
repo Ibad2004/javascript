@@ -1,7 +1,8 @@
-import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { setTimeout as sleep } from "node:timers/promises";
 import { dirname } from "node:path";
 import { config } from "./config.js";
-import { emptyStore, type Expense, type Result, type Store } from "./expenses.js";
+import { emptyStore, toPaisa, type Expense, type Result, type Store } from "./expenses.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -19,6 +20,10 @@ function isValidAmount(value: unknown): value is number {
   return Math.abs(scaled - Math.round(scaled)) < 1e-6;
 }
 
+function isValidPaisa(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 && value <= config.maxAmount * 100;
+}
+
 function isFilledString(value: unknown): value is string {
   return typeof value === "string" && value.trim() !== "";
 }
@@ -28,14 +33,26 @@ function parseExpense(value: unknown, index: number): Result<Expense> {
   if (!isRecord(value)) {
     return { ok: false, error: `${where} is not an object.` };
   }
-  const { id, amount, description, category, date } = value;
+  const { id, amountPaisa, amount, description, category, date } = value;
   if (!isPositiveInteger(id)) {
     return { ok: false, error: `${where}.id must be a whole number above 0.` };
   }
-  if (!isValidAmount(amount)) {
+  // New files store whole paisa. Old files stored a decimal "amount"; it is still read.
+  let paisa: number;
+  if (amountPaisa !== undefined) {
+    if (!isValidPaisa(amountPaisa)) {
+      return {
+        ok: false,
+        error: `${where}.amountPaisa must be a whole number of paisa above 0 (up to ${config.maxAmount * 100}).`,
+      };
+    }
+    paisa = amountPaisa;
+  } else if (isValidAmount(amount)) {
+    paisa = toPaisa(amount);
+  } else {
     return {
       ok: false,
-      error: `${where}.amount must be a positive number up to ${config.maxAmount} with at most 2 decimals.`,
+      error: `${where}.amountPaisa (whole paisa) or the old ${where}.amount (up to ${config.maxAmount}, at most 2 decimals) is missing or not valid.`,
     };
   }
   if (!isFilledString(description)) {
@@ -47,7 +64,7 @@ function parseExpense(value: unknown, index: number): Result<Expense> {
   if (typeof date !== "string" || Number.isNaN(Date.parse(date))) {
     return { ok: false, error: `${where}.date must be an ISO date string.` };
   }
-  return { ok: true, value: { id, amount, description, category, date } };
+  return { ok: true, value: { id, amountPaisa: paisa, description, category, date } };
 }
 
 export function parseStore(value: unknown): Result<Store> {
@@ -140,4 +157,68 @@ export async function writeExport(filePath: string, text: string, force: boolean
   }
   await writeTextSafely(filePath, text);
   return { ok: true, value: filePath };
+}
+
+function isLockBusy(error: unknown): boolean {
+  return (
+    isRecord(error) && (error["code"] === "EEXIST" || error["code"] === "EPERM" || error["code"] === "EBUSY")
+  );
+}
+
+async function removeIfStale(lockFile: string, staleMs: number): Promise<void> {
+  try {
+    const info = await stat(lockFile);
+    if (Date.now() - info.mtimeMs > staleMs) {
+      await rm(lockFile, { force: true });
+    }
+  } catch (error) {
+    if (!isMissingFile(error)) {
+      throw error;
+    }
+  }
+}
+
+export function lockPathFor(filePath: string): string {
+  return `${filePath}${config.lockSuffix}`;
+}
+
+export interface LockOptions {
+  waitMs?: number;
+  staleMs?: number;
+}
+
+// Only one command at a time may read-change-write the data file. The lock is a file created
+// with the "wx" flag (fails if it exists). A lock older than staleMs is left over from a crash.
+export async function withLock<T>(
+  filePath: string,
+  action: () => Promise<T>,
+  { waitMs = config.lockWaitMs, staleMs = config.lockStaleMs }: LockOptions = {},
+): Promise<T> {
+  const lockFile = lockPathFor(filePath);
+  await mkdir(dirname(filePath), { recursive: true });
+  const deadline = Date.now() + waitMs;
+  for (;;) {
+    try {
+      const handle = await open(lockFile, "wx");
+      await handle.writeFile(String(process.pid));
+      await handle.close();
+      break;
+    } catch (error) {
+      if (!isLockBusy(error)) {
+        throw error;
+      }
+      await removeIfStale(lockFile, staleMs);
+      if (Date.now() > deadline) {
+        throw new Error(
+          `Could not lock ${filePath}: another command is using it. If none is running, delete ${lockFile}.`,
+        );
+      }
+      await sleep(config.lockRetryMs);
+    }
+  }
+  try {
+    return await action();
+  } finally {
+    await rm(lockFile, { force: true });
+  }
 }

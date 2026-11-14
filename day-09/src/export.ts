@@ -1,6 +1,6 @@
 import { basename } from "node:path";
 import { config } from "./config.js";
-import { formatPaisa, isoDay, toPaisa, type Expense, type Result } from "./expenses.js";
+import { formatPaisa, localDay, type Expense, type Result } from "./expenses.js";
 
 export const csvColumns = ["id", "date", "category", "amount", "description"];
 
@@ -16,9 +16,9 @@ export function escapeCsvCell(value: string): string {
 export function toCsv(expenses: Expense[]): string {
   const rows = expenses.map((expense) => [
     String(expense.id),
-    isoDay(expense.date),
+    localDay(expense.date),
     expense.category,
-    formatPaisa(toPaisa(expense.amount)),
+    formatPaisa(expense.amountPaisa),
     expense.description,
   ]);
   return [csvColumns, ...rows]

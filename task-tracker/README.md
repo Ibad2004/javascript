@@ -3,16 +3,20 @@
 A small task tracker built with **Vite + React + TypeScript**.
 This is a one-week project: every day I add to the **same app**.
 
-| Day | What the day adds                                                                                         | Status                                        |
-| --- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| 11  | Tracker pages with **static data**: components, JSX, props, state                                         | Done                                          |
-| 12  | Add, edit and delete tasks **in memory**: events, forms, controlled inputs, lists and keys                | Done                                          |
-| 13  | Read tasks from a mock API (**json-server**): `useEffect`, fetching, loading and error states             | Done                                          |
-| 14  | Filters, a task detail page and a `useTasks` hook: custom hooks, lifting state, context, **React Router** | Done                                          |
-| 15  | Styling, basic accessibility and a responsive layout, then deploy on **Vercel**                           | Part A done (look, a11y, dialog); deploy next |
+| Day | What the day adds                                                                                         | Status                                         |
+| --- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| 11  | Tracker pages with **static data**: components, JSX, props, state                                         | Done                                           |
+| 12  | Add, edit and delete tasks **in memory**: events, forms, controlled inputs, lists and keys                | Done                                           |
+| 13  | Read tasks from a mock API (**json-server**): `useEffect`, fetching, loading and error states             | Done                                           |
+| 14  | Filters, a task detail page and a `useTasks` hook: custom hooks, lifting state, context, **React Router** | Done                                           |
+| 15  | Styling, basic accessibility and a responsive layout, then deploy on **Vercel**                           | Done (the live link is added after the deploy) |
 
-Day 15 part A (the look, accessibility, the delete dialog) is done; the deploy is part B. Since Day 13 the tasks are saved on a local mock server (json-server), so a
-page refresh keeps the changes. The header says so on screen too.
+**Live demo:** (link added after deploy)
+
+The app has **two data sources with the same functions**: for local work the tasks are saved on a
+mock server (json-server, `db.json`); the live demo on Vercel has no server, so there they are saved
+in the browser (`localStorage`). Either way a page refresh keeps the changes, and the header says
+where they are: "Saved on the local mock server (json-server)" or "Saved in this browser".
 
 ## How to run
 
@@ -42,12 +46,42 @@ survive a restart; `npm.cmd run db:reset` throws them away and starts over.
   `npx.cmd json-server --watch db.json --port 3002` and put `VITE_API_URL=http://localhost:3002` in
   `.env`.
 
+**The live version (browser storage) on your own PC**, exactly as Vercel builds it:
+
+```powershell
+npm.cmd run build        # uses .env.production: VITE_DATA_SOURCE=local
+npx.cmd vite preview     # open the printed URL; no json-server needed
+```
+
+`VITE_DATA_SOURCE` picks the source: `api` (the default, json-server) or `local` (browser storage).
+`.env.production` sets `local` for every production build; it holds no secrets, so it is committed
+(`!.env.production` in `.gitignore`). To try browser storage in `npm.cmd run dev`, put
+`VITE_DATA_SOURCE=local` in a `.env` file.
+
 Other scripts: `npm.cmd run lint`, `npm.cmd run build`, `npm.cmd run format`,
 `npm.cmd run format:check`, `npm.cmd run test:watch`.
 
 On Linux or macOS use plain `npm` (`npm ci`, `npm run dev`, `npm run check`). Vite 8 needs
 **Node 20.19+ or 22.12+**. If `node --version` is older, install a newer one with
 [nvm](https://github.com/nvm-sh/nvm): `nvm install 22`.
+
+## Deploy (Vercel)
+
+1. On vercel.com: **Add New → Project**.
+2. Import the GitHub repository **Ibad2004/javascript**.
+3. **Root Directory**: `task-tracker`. **Framework Preset**: Vite (the build command
+   `npm run build` and the output folder `dist` are its defaults).
+4. **Deploy**. Nothing else to set: `.env.production` switches the build to browser storage.
+
+`vercel.json` rewrites every path to `/index.html`, so `/tasks/task-2` or `/?status=done` opened
+from a shared link or after a reload gets the app (which then shows the page), not a Vercel 404.
+Vercel serves real files (`/assets/…`) before the rewrite applies.
+
+**Checked before deploying** (production build + `vite preview` in headless Edge, empty storage):
+the header said "Saved in this browser" and 8 sample tasks were stored; a fresh load of
+`/tasks/task-2` showed that task, `/?status=done` showed 3 tasks; ticking a task and reloading kept
+it ticked; no request went to `:3001`; **0 console errors or warnings**. (`vite preview` has its own
+fallback to `index.html`, so the rewrite itself is only proven on Vercel.)
 
 ## Component tree
 
@@ -56,7 +90,7 @@ BrowserRouter (main.tsx)   MemoryRouter in the tests
 └── App
     └── TasksProvider      calls useTasks() ONCE; every page reads it with useTasksContext()
         └── AppRoutes      moves focus to the new page's <h1> after an in-app navigation
-            ├── Header     title + "Saved on the local mock server (json-server)"
+            ├── Header     title + where the data lives ("Saved in this browser" / "…mock server…")
             ├── Routes
             │   ├── "/"           TaskListPage
             │   │   ├── <p> / error box   "Loading tasks…" (aria-busy), or the error + [Try again]
@@ -155,7 +189,7 @@ State is never changed in place. Every update builds a new array or object with 
 `filter` or `toSpliced`, and the pure functions in `src/utils/tasks.ts` are tested on **frozen**
 arrays, so a mutation would throw in the test.
 
-## Day 15 (part A): the look, responsive layout, accessibility and a delete dialog
+## Day 15: the look, responsive layout, accessibility, a delete dialog and the deploy
 
 ### What works now
 
@@ -252,6 +286,38 @@ and focus came back to Delete. With reduced motion the button transition was `1e
 `auto` (without it: `0.12s` and `smooth`). The focus ring after Tab was a 3px solid outline in the
 dark theme's focus colour. I looked at the screenshots at 320, 375 (light and dark), 768 and 1440 px.
 
+### Two data sources, one interface
+
+| Source              | File                    | Used when                                  | Where the data lives                       |
+| ------------------- | ----------------------- | ------------------------------------------ | ------------------------------------------ |
+| json-server (`api`) | `src/api/tasks.ts`      | local work (`npm.cmd run start:all`)       | `db.json` on your PC                       |
+| browser (`local`)   | `src/api/localTasks.ts` | `VITE_DATA_SOURCE=local`: the Vercel build | `localStorage` key `task-tracker:tasks:v1` |
+
+Both give `getTasks`, `createTask`, `updateTask` and `deleteTask` with the same results and the same
+errors (a missing task is "This task no longer exists" in both). `src/api/index.ts` picks one from
+`VITE_DATA_SOURCE` (anything but `local` means json-server) and `useTasks` only sees the shared
+`TasksSource` type. **Why:** Vercel hosts static files only, so json-server cannot run there, but
+the demo must still save and survive a reload; for local work json-server stays, because it
+behaves like a real server (slow, off, 404, 500), which is what Day 13 was about.
+
+What the browser source does with **untrusted storage** (anyone can edit `localStorage` in DevTools):
+
+- **First visit** (nothing saved): the 8 sample tasks from `db.seed.json`, with due dates built from
+  the **local** today (`addDays` on local date parts, never `toISOString`).
+- **Bad items** (wrong types, no id, a repeated id): skipped, with the same "N items … were skipped"
+  line as with json-server.
+- **The whole value is broken** (not JSON, or not a list): it is copied to
+  `task-tracker:tasks:v1:backup`, the samples are put back, and a message says so.
+- **Storage blocked** (private mode, site data turned off; even reading `window.localStorage` can
+  throw) **or full** (`QuotaExceededError`): the app keeps working in memory and shows "Changes
+  can't be saved in this browser (storage is blocked or full). They stay until you close or reload
+  this tab."
+- **Two tabs**: every change reads the saved list fresh before writing, so another tab's task is not
+  overwritten, and the `storage` event reloads the list in the other tab ("The list was updated in
+  another tab" is announced).
+- **Reset demo data** (only in browser mode, at the bottom of the list): the same `<dialog>` as
+  Delete, "Reset the demo data?" [Cancel] [Reset]. json-server has `npm run db:reset` instead.
+
 ### Choices I made, and why
 
 | Choice                                               | Why                                                                                                                                                            |
@@ -267,7 +333,12 @@ dark theme's focus colour. I looked at the screenshots at 320, 375 (light and da
 | **`aria-disabled` look in CSS**                      | From Day 13: busy controls keep focus, so the "disabled" look (opacity 0.55, not-allowed cursor) comes from CSS, for both `aria-disabled` and real `disabled`. |
 | **The inline "Show all" / "Clear filters" links**    | Vertical padding makes them 44 px tall without changing how the sentence looks.                                                                                |
 
-**Known limits (Day 15, part A)**
+**Known limits (Day 15)**
+
+- Browser storage belongs to one browser on one device: the phone and the laptop each have their own
+  tasks. That is fine for a demo, not for real use.
+- Two tabs that change the same task within the same moment: the last write wins (no version check),
+  as with json-server.
 
 - jsdom has no `showModal()`. The tests use a small stand-in (`src/test/setup.ts`) that only sets
   `open` and fires `close`. Focus trapping and the inert page behind the dialog come from the
@@ -348,18 +419,23 @@ Limits I know about: the unsaved-changes bar guards in-app links only, not the b
 button or closing the tab. Two tabs do not sync live; a change from another tab shows up on a
 reload, or as a 404 message when you touch a task the other tab deleted (Day 13).
 
-## Demo script (2 minutes)
+## Demo script (2 minutes, on a phone)
 
-1. `npm run db:reset` and `npm run start:all`, open the URL. "Showing 8 of 8 tasks".
-2. Click **Pending**: the button is pressed, the list shrinks, the URL is `/?status=pending`.
-3. Choose **High** under "Filter by priority": both filters, `?status=pending&priority=high`.
-4. Type `c++` or `(` in the search: no error. Then a word that matches nothing: "No tasks match
-   these filters" → **Clear filters**, the cursor is back in the search.
-5. Under **Done**, add a task: "Task added, but hidden by your filters. [Show all]" → Show all.
-6. Set a filter, open a task, edit the title, click **Back to tasks**: the unsaved-changes bar.
-   Save: you are back on the list **with the same filters**.
-7. Reload: the filters stay. Press the browser's Back: the last filter change is undone.
-8. Paste `/?status=DONE&priority=urgent&q=` + a very long text: no crash, sensible defaults.
+Open the live link on the phone (the first visit stores the 8 sample tasks in that browser).
+
+1. **The look**: cards with a coloured edge, "Priority: High" and "Overdue (was due …)" badges in
+   words, full-width Edit / Delete buttons. Turn on the phone's dark mode: the app follows it.
+2. **Filters**: tap **Pending**: the list shrinks and the address bar shows `/?status=pending`.
+3. **Delete**: tap Delete on a task: the dialog asks "Delete “…”?". Tap the dark area: nothing
+   changes. Tap Delete again, then **Delete** in the dialog: gone, and the **Undo** bar shows; tap
+   Undo: it is back in the same place.
+4. **Add**: type a title with an emoji 🛒 and tap **Add task**.
+5. **Open a task**: tap its title. Tick "Mark as done". **Reload the page**: it is still done (it
+   is saved in this browser), and the address `/tasks/…` still works.
+6. **Share the link** of a filtered list (`/?status=done`) and open it in a new tab: same view.
+7. **Turn the phone sideways**: the layout widens, no sideways scrolling.
+8. **Reset demo data** (at the bottom of the list): the same dialog; Reset brings back the 8
+   sample tasks.
 
 ## Day 13: the tracker reads from a mock API (json-server)
 
@@ -642,45 +718,47 @@ Tests in `src/keys.test.tsx`:
 
 ## Tests
 
-**356 tests in 26 files** (Day 14 had 276 in 22), run with Vitest + React Testing Library + jsdom.
+**392 tests in 28 files** (Day 14 had 276 in 22), run with Vitest + React Testing Library + jsdom.
 No test calls a real server: the network is replaced with `vi.spyOn(globalThis, 'fetch')`, either
 directly or through `src/test/fakeServer.ts`, a small in-memory json-server (same 404 and
 duplicate-id 500 answers as the real one) that can also fail, hang or hold a request. Since Day 14
 the App renders inside a `MemoryRouter` (`renderApp(tasks, { route: '/?status=done' })`).
 
-| File                                          | Tests | What it checks                                                                                                                                                                                                                      |
-| --------------------------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/styles/styles.test.ts`                   | 57    | **Day 15.** every CSS file found and read; no raw colours outside tokens.css; every `var()` defined; focus ring never removed; reduced motion; long titles wrap; 25 contrast pairs × 2 themes; the contrast formula itself          |
-| `src/utils/tasks.test.ts`                     | 33    | sorting, summary and "Showing X of Y" texts, addTask, updateTask, deleteTask, restoreTask, setDone (frozen arrays), validateTask, countChars, makeId                                                                                |
-| `src/api/tasks.test.ts`                       | 26    | every API function: ok, 404, 500 (body cancelled), server off, 8 s timeout, non-JSON, bad items skipped, duplicate ids, PATCH body, caller abort                                                                                    |
-| `src/components/TaskForm.test.tsx`            | 24    | labels, trimming, required title, counters, emoji, 100/500 limits, invalid and half-typed dates, warnings, double click, edit mode, Escape                                                                                          |
-| `src/App.save.test.tsx`                       | 20    | "Saving…", failed add/edit keep the text, PATCH only changed fields, optimistic done/delete + rollback, Undo with the same id, 404, double clicks                                                                                   |
-| `src/utils/filters.test.ts`                   | 20    | **Day 14.** URL reading (case, unknown, empty, repeats, 100 chars, emoji not split), writing (defaults left out), round trip, spaces/case/Urdu, `c++` `(` `.*` `[` as plain text, counts                                            |
-| `src/App.routes.test.tsx`                     | 19    | **Day 14.** the three routes, tab titles, `<h1>` focus, loading vs not found, load error, odd ids, trailing slash, done/delete/404 on the task page                                                                                 |
-| `src/utils/dates.test.ts`                     | 17    | formatting, null, invalid dates, leap years, local today, addDays, overdue / today with a fake today                                                                                                                                |
-| `src/App.filters.test.tsx`                    | 15    | **Day 14.** counts + aria-pressed, priority, search, Urdu, push vs replace history, bad URL, Clear filters focus, every hidden-by-filter message, Show all, Back to tasks                                                           |
-| `scripts/seed.test.mjs`                       | 14    | the seed: 6 to 8 tasks, unique ids, valid dates, edge cases present, local date, broken seed                                                                                                                                        |
-| `src/App.edit.test.tsx`                       | 14    | the task page's form: prefilled, focus, Save, Escape/Cancel, empty title blocked, unsaved-changes bar on in-app links, no `window.confirm`                                                                                          |
-| `src/App.load.test.tsx`                       | 14    | loading → ready, error → Try again, empty list, StrictMode double effect, abort on unmount, timeout, non-JSON, bad items warning                                                                                                    |
-| `src/App.dialog.test.tsx`                     | 11    | **Day 15.** the delete dialog: opens with the title and focus on Cancel; Cancel, Escape and backdrop change nothing and return focus; confirm keeps Undo; double click deletes once; busy task; long and Urdu titles; the task page |
-| `src/App.a11y.test.tsx`                       | 8     | **Day 15.** axe-core on 7 page states (zero violations) + a control test that axe does report a nameless button                                                                                                                     |
-| `src/components/ConfirmDeleteDialog.test.tsx` | 4     | **Day 15.** showModal + Cancel first; first answer wins; the browser's "cancel" event; closed when removed                                                                                                                          |
-| `src/components/TaskItem.test.tsx`            | 13    | text status/priority, overdue, due today, link + Edit link, dir, Edit/Delete/checkbox names, row layout                                                                                                                             |
-| `src/App.delete.test.tsx`                     | 12    | delete + announce, focus next/previous/heading, Undo position, 5 s timer, pause on hover and focus, latest only, Delete on the task page, no timer leak                                                                             |
-| `src/App.add.test.tsx`                        | 7     | add + trim + focus + announce, Enter, spaces-only title, double click, empty state goes away, duplicate allowed, header note                                                                                                        |
-| `src/App.done.test.tsx`                       | 6     | summary live, Space, sort after tick, ticked under "Pending" leaves with a message + focus, last one → heading, lost update                                                                                                         |
-| `src/utils/pageTitle.test.ts`                 | 5     | **Day 14.** "Tasks", task titles, the 50-character cut with "…"                                                                                                                                                                     |
-| `src/App.test.tsx`                            | 4     | empty list, sort order, each task is a link, keyboard Tab + Enter                                                                                                                                                                   |
-| `src/components/TaskSummary.test.tsx`         | 4     | 0 tasks, 1 of 1, some done, all done                                                                                                                                                                                                |
-| `src/components/TaskDetail.test.tsx`          | 3     | "No description" (empty and spaces only), full detail with line breaks                                                                                                                                                              |
-| `src/keys.test.tsx`                           | 2     | the keys demo (see "Why keys matter")                                                                                                                                                                                               |
-| `src/context/TasksContext.test.tsx`           | 2     | **Day 14.** one shared load for all pages; a clear error outside the provider                                                                                                                                                       |
-| `src/utils/plural.test.ts`                    | 2     | 0 / 1 / 2 and a custom plural                                                                                                                                                                                                       |
+| File                                          | Tests | What it checks                                                                                                                                                                                                                                                                                |
+| --------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/styles/styles.test.ts`                   | 57    | **Day 15.** every CSS file found and read; no raw colours outside tokens.css; every `var()` defined; focus ring never removed; reduced motion; long titles wrap; 25 contrast pairs × 2 themes; the contrast formula itself                                                                    |
+| `src/utils/tasks.test.ts`                     | 33    | sorting, summary and "Showing X of Y" texts, addTask, updateTask, deleteTask, restoreTask, setDone (frozen arrays), validateTask, countChars, makeId                                                                                                                                          |
+| `src/api/tasks.test.ts`                       | 26    | every API function: ok, 404, 500 (body cancelled), server off, 8 s timeout, non-JSON, bad items skipped, duplicate ids, PATCH body, caller abort                                                                                                                                              |
+| `src/components/TaskForm.test.tsx`            | 24    | labels, trimming, required title, counters, emoji, 100/500 limits, invalid and half-typed dates, warnings, double click, edit mode, Escape                                                                                                                                                    |
+| `src/App.save.test.tsx`                       | 20    | "Saving…", failed add/edit keep the text, PATCH only changed fields, optimistic done/delete + rollback, Undo with the same id, 404, double clicks                                                                                                                                             |
+| `src/utils/filters.test.ts`                   | 20    | **Day 14.** URL reading (case, unknown, empty, repeats, 100 chars, emoji not split), writing (defaults left out), round trip, spaces/case/Urdu, `c++` `(` `.*` `[` as plain text, counts                                                                                                      |
+| `src/App.routes.test.tsx`                     | 19    | **Day 14.** the three routes, tab titles, `<h1>` focus, loading vs not found, load error, odd ids, trailing slash, done/delete/404 on the task page                                                                                                                                           |
+| `src/utils/dates.test.ts`                     | 17    | formatting, null, invalid dates, leap years, local today, addDays, overdue / today with a fake today                                                                                                                                                                                          |
+| `src/App.filters.test.tsx`                    | 15    | **Day 14.** counts + aria-pressed, priority, search, Urdu, push vs replace history, bad URL, Clear filters focus, every hidden-by-filter message, Show all, Back to tasks                                                                                                                     |
+| `scripts/seed.test.mjs`                       | 14    | the seed: 6 to 8 tasks, unique ids, valid dates, edge cases present, local date, broken seed                                                                                                                                                                                                  |
+| `src/App.edit.test.tsx`                       | 14    | the task page's form: prefilled, focus, Save, Escape/Cancel, empty title blocked, unsaved-changes bar on in-app links, no `window.confirm`                                                                                                                                                    |
+| `src/App.load.test.tsx`                       | 14    | loading → ready, error → Try again, empty list, StrictMode double effect, abort on unmount, timeout, non-JSON, bad items warning                                                                                                                                                              |
+| `src/api/localTasks.test.ts`                  | 26    | **Day 15.** browser storage: samples with local dates (month end), CRUD under one key, missing id, duplicate id, another tab's task kept, bad items, broken value → backup + samples, blocked, SecurityError, quota, storage event, reset, abort; choosing the source from `VITE_DATA_SOURCE` |
+| `src/App.local.test.tsx`                      | 10    | **Day 15.** the App on browser storage: header note, first visit, changes saved, damaged storage, bad items, blocked, full, another tab; Reset demo data (only in local mode, Cancel/Escape, Reset + Undo cleared)                                                                            |
+| `src/App.dialog.test.tsx`                     | 11    | **Day 15.** the delete dialog: opens with the title and focus on Cancel; Cancel, Escape and backdrop change nothing and return focus; confirm keeps Undo; double click deletes once; busy task; long and Urdu titles; the task page                                                           |
+| `src/App.a11y.test.tsx`                       | 8     | **Day 15.** axe-core on 7 page states (zero violations) + a control test that axe does report a nameless button                                                                                                                                                                               |
+| `src/components/ConfirmDeleteDialog.test.tsx` | 4     | **Day 15.** showModal + Cancel first; first answer wins; the browser's "cancel" event; closed when removed                                                                                                                                                                                    |
+| `src/components/TaskItem.test.tsx`            | 13    | text status/priority, overdue, due today, link + Edit link, dir, Edit/Delete/checkbox names, row layout                                                                                                                                                                                       |
+| `src/App.delete.test.tsx`                     | 12    | delete + announce, focus next/previous/heading, Undo position, 5 s timer, pause on hover and focus, latest only, Delete on the task page, no timer leak                                                                                                                                       |
+| `src/App.add.test.tsx`                        | 7     | add + trim + focus + announce, Enter, spaces-only title, double click, empty state goes away, duplicate allowed, header note                                                                                                                                                                  |
+| `src/App.done.test.tsx`                       | 6     | summary live, Space, sort after tick, ticked under "Pending" leaves with a message + focus, last one → heading, lost update                                                                                                                                                                   |
+| `src/utils/pageTitle.test.ts`                 | 5     | **Day 14.** "Tasks", task titles, the 50-character cut with "…"                                                                                                                                                                                                                               |
+| `src/App.test.tsx`                            | 4     | empty list, sort order, each task is a link, keyboard Tab + Enter                                                                                                                                                                                                                             |
+| `src/components/TaskSummary.test.tsx`         | 4     | 0 tasks, 1 of 1, some done, all done                                                                                                                                                                                                                                                          |
+| `src/components/TaskDetail.test.tsx`          | 3     | "No description" (empty and spaces only), full detail with line breaks                                                                                                                                                                                                                        |
+| `src/keys.test.tsx`                           | 2     | the keys demo (see "Why keys matter")                                                                                                                                                                                                                                                         |
+| `src/context/TasksContext.test.tsx`           | 2     | **Day 14.** one shared load for all pages; a clear error outside the provider                                                                                                                                                                                                                 |
+| `src/utils/plural.test.ts`                    | 2     | 0 / 1 / 2 and a custom plural                                                                                                                                                                                                                                                                 |
 
 Every date test uses a fake today (`2026-11-10`), so the tests never depend on the real date. The
 Undo tests use Vitest fake timers (see "What broke").
 
-**Old tests I changed on Day 15** (Delete now asks first):
+**Old tests I changed on Day 15** (Delete now asks first; the second data source changed no old test):
 
 - 20 old tests click Delete and now also confirm in the dialog, through one new helper,
   `deleteAndConfirm(user, 'Delete Task B')` in `src/test/renderApp.tsx`. What they check did not
@@ -762,10 +840,11 @@ Undo tests use Vitest fake timers (see "What broke").
 | **Day 15:** the dialog's "first answer wins" guard removed        | 0 at first, then 1 (see "What broke on Day 15") |
 | **Day 15:** `--color-text-muted` (light) set to a pale grey       | 2 (both contrast pairs with it)                 |
 | **Day 15:** a `color: #ff0000` added to `layout.css`              | 1 (no raw colours)                              |
+| **Day 15:** the backup copy of damaged storage removed            | 3 (one per kind of broken value)                |
 
 ## What broke on Day 15
 
-Real problems and surprises from Day 15 (part A):
+Real problems and surprises from Day 15 (parts A and B):
 
 1. **jsdom has no `<dialog>` API.** `showModal` is not a function there, so every dialog test
    crashed at first. `src/test/setup.ts` adds a small stand-in that only sets `open` and fires
@@ -793,8 +872,12 @@ Real problems and surprises from Day 15 (part A):
    found | Tasks'"), then once in 3 runs of that file alone, then 0 times in 8 runs on `main` and 8
    on this branch. The tab title is set in an effect, which can run a moment after the DOM shows
    the page, and `waitForLoad()` only waited for the DOM. It now waits for the title too.
-9. **axe found zero violations on the first run.** That made me suspicious, so I added a control
-   test with a nameless button: axe reports `button-name`, so the setup really checks.
+9. **The lint failed after the switch to two sources** (part B): "React Hook useEffect has a
+   missing dependency: 'getTasks'". The load effect now read `getTasks` from the chosen source,
+   but its dependency list was still `[loadAttempt]`. It now calls `source.getTasks` and depends on
+   `[loadAttempt, source]`, so a different source would load again.
+10. **axe found zero violations on the first run.** That made me suspicious, so I added a control
+    test with a nameless button: axe reports `button-name`, so the setup really checks.
 
 ## What broke on Day 14
 
@@ -926,5 +1009,5 @@ Real problems and surprises from building Day 11:
 
 ## Tech
 
-React 19, TypeScript 7 (strict), Vite 8, plain CSS with custom properties, axe-core 4.14.0, oxlint, Prettier, Vitest 5, React Testing Library, jsdom,
+React 19, TypeScript 7 (strict), Vite 8, plain CSS with custom properties, axe-core 4.14.0, localStorage (live demo), Vercel, oxlint, Prettier, Vitest 5, React Testing Library, jsdom,
 json-server 0.17.4 (mock API), concurrently.

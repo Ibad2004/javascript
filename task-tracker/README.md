@@ -3,15 +3,15 @@
 A small task tracker built with **Vite + React + TypeScript**.
 This is a one-week project: every day I add to the **same app**.
 
-| Day | What the day adds                                                                                         | Status                                         |
-| --- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| 11  | Tracker pages with **static data**: components, JSX, props, state                                         | Done                                           |
-| 12  | Add, edit and delete tasks **in memory**: events, forms, controlled inputs, lists and keys                | Done                                           |
-| 13  | Read tasks from a mock API (**json-server**): `useEffect`, fetching, loading and error states             | Done                                           |
-| 14  | Filters, a task detail page and a `useTasks` hook: custom hooks, lifting state, context, **React Router** | Done                                           |
-| 15  | Styling, basic accessibility and a responsive layout, then deploy on **Vercel**                           | Done (the live link is added after the deploy) |
+| Day | What the day adds                                                                                         | Status                                                  |
+| --- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| 11  | Tracker pages with **static data**: components, JSX, props, state                                         | Done                                                    |
+| 12  | Add, edit and delete tasks **in memory**: events, forms, controlled inputs, lists and keys                | Done                                                    |
+| 13  | Read tasks from a mock API (**json-server**): `useEffect`, fetching, loading and error states             | Done                                                    |
+| 14  | Filters, a task detail page and a `useTasks` hook: custom hooks, lifting state, context, **React Router** | Done                                                    |
+| 15  | Styling, basic accessibility and a responsive layout, then deploy on **Vercel**                           | Done ([live demo](https://task-track-ibad.vercel.app/)) |
 
-**Live demo:** (link added after deploy)
+**Live demo:** [https://task-track-ibad.vercel.app/](https://task-track-ibad.vercel.app/)
 
 The app has **two data sources with the same functions**: for local work the tasks are saved on a
 mock server (json-server, `db.json`); the live demo on Vercel has no server, so there they are saved

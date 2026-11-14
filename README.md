@@ -87,7 +87,7 @@ npm start
 | 12 | Events, forms, controlled inputs, lists and keys: add, edit and delete tasks (in memory) | [task-tracker](task-tracker/) |
 | 13 | useEffect, fetching, loading and error states: read tasks from a mock API (json-server) | [task-tracker](task-tracker/) |
 | 14 | Custom hooks, lifting state, context, React Router: filters, a task detail page, a useTasks hook | [task-tracker](task-tracker/) |
-| 15 | Styling, basic accessibility, responsive layout: deployed on Vercel | [task-tracker](task-tracker/) |
+| 15 | Styling, basic accessibility, responsive layout: deployed on Vercel | [task-tracker](task-tracker/), [live demo](https://task-track-ibad.vercel.app/) |
 
 Days 11 to 15 build one app, the [task tracker](task-tracker/) (Week 3). Its own README lists what
 each day adds. Days 12 to 15 are planned.

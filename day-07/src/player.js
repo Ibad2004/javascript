@@ -1,9 +1,9 @@
 /* eslint-disable func-names */
-const Character = require('../src/character');
+const Character = require('./character');
 
 function Player(config) {
   Character.call(this, config);
-  this.equippedWeapon = config.equippedWeapon;
+  this.equippedWeapon = config.equippedWeapon === undefined ? null : config.equippedWeapon;
 }
 
 Player.prototype = Object.create(Character.prototype);
@@ -14,8 +14,14 @@ Object.defineProperty(Player.prototype, 'constructor', {
   writable: true,
 });
 
+Player.prototype._weaponDamage = function () {
+  const damage = this.equippedWeapon ? this.equippedWeapon.damage : 0;
+  return typeof damage === 'number' && damage > 0 ? damage : 0;
+};
+
 Player.prototype._describeAttack = function (target) {
-  return `${this.name} lets out a ${this.dialogue}, and hits ${target.name} with ${this.equippedWeapon.name} for ${this.equippedWeapon.damage} damage!`;
+  const weapon = this.equippedWeapon ? this.equippedWeapon.name : 'bare hands';
+  return `${this.name} lets out a ${this.dialogue}, and hits ${target.name} with ${weapon} for ${this._weaponDamage()} damage!`;
 };
 
 Player.prototype.equip = function (weapon) {
@@ -23,7 +29,10 @@ Player.prototype.equip = function (weapon) {
 };
 
 Player.prototype.attack = function (target) {
-  target._takeDamage(this.equippedWeapon.damage);
+  if (target === null || typeof target !== 'object' || typeof target._takeDamage !== 'function') {
+    throw new TypeError('attack needs a target that can take damage');
+  }
+  target._takeDamage(this._weaponDamage());
   return this._describeAttack(target);
 };
 

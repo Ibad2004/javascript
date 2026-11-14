@@ -1,11 +1,13 @@
 # Day 07 - Debugging with Breakpoints and Stack Traces
 
-Day 7 is about **finding bugs properly**: instead of adding `console.log` everywhere, I
-**paused the code** with breakpoints and looked at the real values while it was running.
+Day 7 is about **finding bugs properly**: reading stack traces and test output to find
+where a bug is, instead of adding `console.log` everywhere. The sections on breakpoints below
+explain the tools; the notes on each bug record only what the stack traces and test output
+showed.
 
-**Hand-in:** fix 3 planted bugs in a small repo using breakpoints, not `console.log`.
-I found and fixed bugs 1, 2 and 3 with the VS Code debugger. While doing that, the stack
-traces showed 2 more bugs (4 and 5), which I fixed too, so every test now passes.
+**Hand-in:** fix the planted bugs in a small repo. Bugs 1, 3, 4 and 5 were found from stack
+traces; bug 2 had no stack trace and was found from the test output and by reading `equip`.
+Every test now passes.
 
 ## Where this code comes from
 
@@ -134,15 +136,11 @@ TypeError: Player is not a constructor
   > 29 |     player = new Player(config);
 ```
 
-**How I found it:** I put a breakpoint on **line 29 of `__tests__/player.test.js`** and ran
-the tests in the JavaScript Debug Terminal. While paused, I hovered over `Player`. It showed
-only `[[Prototype]]: Object`, so `Player` was an **empty object `{}`**, not a function.
-(`player` with a small `p` was `undefined`, which is normal because line 29 had not run yet.)
-
-`Player` comes from `require('../src/player')`. `require` returns whatever the file puts in
-`module.exports`. If a file never sets it, `require` gives back an empty object. So the
-problem was how `player.js` shares the function. I compared the last line of `player.js`
-with `enemy.js`:
+**How I found it (from the stack trace only):** the first line says `Player is not a constructor`,
+and the first `at` line is in the test file, at the `new Player(config)` line. `new` only works on
+a function, so `Player` was not a function. `Player` comes from `require('../src/player')`, and
+`require` returns whatever the file puts in `module.exports`. So the next place to look was the
+**end of `src/player.js`**, not the test. I compared that last line with `src/enemy.js`:
 
 ```js
 module.export = Player;
@@ -170,16 +168,10 @@ Expected: {"attackType": "slashes", "damage": 3, "name": "bronze sword"}
 Received: undefined
 ```
 
-**How I found it:** a breakpoint on **line 45 of the test** (`player.equip(sword);`), then
-**Step Into (F11)** to go inside `equip`. In the Variables panel:
-
-| Name | Value while paused inside `equip` |
-| --- | --- |
-| `weapon` (the input) | `{name: 'bronze sword', damage: 3, attackType: 'slashes'}` |
-| `this.weapon` | does not exist on the player, so `undefined` |
-| `this.equippedWeapon` after **Step Over (F10)** | still `undefined` |
-
-The sword **did arrive** in the function, but the line stored something else:
+**How I found it:** there is **no stack trace** for this bug, because nothing crashed. The
+test output only says `Received: undefined`, so the value was lost somewhere between the
+`player.equip(sword)` call and the check. The test output points to `equip`, so I read
+`equip` in `src/player.js`. The line stored something other than its input:
 
 ```js
 Player.prototype.equip = function (weapon) {
@@ -210,13 +202,14 @@ TypeError: Cannot read properties of undefined (reading 'damage')
 
 This time the stack trace pointed straight into `src/player.js`, line 26.
 
-**How I found it:** a breakpoint on **line 26 of `src/player.js`**. While paused I opened
-`this` in the Variables panel: the player had `equippedWeapon` (the sword, stored there by
-the bug 2 fix) but **no `weapon` property**.
+**How I found it (from the stack trace only):** the trace names `src/player.js:26:34` and
+says `reading 'damage'` of `undefined`. Line 26 has only one `.damage` read, so
+`this.weapon` was `undefined`. Looking at the rest of `player.js`, the weapon is saved as
+`this.equippedWeapon` in `equip` (bug 2).
 
 My first try was to remove `this.` like in bug 2, but that is wrong here: `attack` only
 receives `target`, so a plain `weapon` does not exist in this function and would give a
-`ReferenceError`. The sword is stored on the player as `equippedWeapon`.
+`ReferenceError`.
 
 **Cause:** the code read the weapon from the wrong property.
 
@@ -263,9 +256,9 @@ Player.prototype.attack = function (target) {
 
 | Bug | Symptom | Found with | Cause | Fix |
 | --- | --- | --- | --- | --- |
-| 1 | `Player is not a constructor` | Breakpoint in the test + hover: `Player` was `{}` | `module.export` typo | `module.exports` |
-| 2 | equip: expected the sword, got `undefined` | Breakpoint + **Step Into** `equip` | Stored `this.weapon` instead of the `weapon` input | `this.equippedWeapon = weapon` |
-| 3 | `reading 'damage'` of `undefined` | Breakpoint on `player.js:26`, looked inside `this` | Read `this.weapon` | `this.equippedWeapon.damage` |
+| 1 | `Player is not a constructor` | Stack trace, then the export line of `player.js` | `module.export` typo | `module.exports` |
+| 2 | equip: expected the sword, got `undefined` | Test output (no stack trace), then reading `equip` | Stored `this.weapon` instead of the `weapon` input | `this.equippedWeapon = weapon` |
+| 3 | `reading 'damage'` of `undefined` | Stack trace `player.js:26:34` | Read `this.weapon` | `this.equippedWeapon.damage` |
 | 4 | `enemy is not defined` | Stack trace | Undefined name `enemy` | Pass `target` |
 | 5 | Would crash on `this.target.name` | Reading the code after bug 4 | Player never stores a target | `_describeAttack(target)` uses `target.name` |
 
@@ -278,13 +271,18 @@ The git history shows the buggy starter and each fix:
 | `Day 07: fix bugs 4 and 5 - ...` | Bugs 2, 3, 4 and 5. I forgot to commit bugs 2 and 3 on their own, so they ended up in this commit even though its title only names 4 and 5. |
 | `Day 07: fix bugs 4 and 5, add README` | Only this README and the Progress row (no code) |
 
-### Two oddities left as they are
+### Review fixes (added later)
 
-The tests do not check these, and they do not break anything, so I did not change them:
-
-- `require('../src/character')` works, but `require('./character')` is the normal way.
-- The constructor sets `equippedWeapon` from `config` (so it starts as `undefined`). The
-  original working version starts it as `null`, meaning "no weapon yet".
+- `player.js` now uses `require('./character')`.
+- `equippedWeapon` starts as `null`. A player with no weapon attacks with 0 damage and returns
+  normally (no crash on `null.damage`).
+- Negative damage counts as 0, so an attack never heals (a weapon or enemy with negative
+  damage does 0 damage). `NaN` and non-number damage throw a `TypeError`.
+- `attack` without a target (or with something that has no `_takeDamage`) throws
+  `"attack needs a target that can take damage"`.
+- `Character`, `Player`, `Enemy` and `Weapon` without a config object throw a `TypeError`
+  that names the fields needed.
+- The new tests are in `__tests__/review.test.js` (46 tests in total).
 
 ---
 
@@ -294,24 +292,17 @@ The tests do not check these, and they do not break anything, so I did not chang
    scripts is disabled on this system"*. `npm test` had worked earlier because it ran in
    Command Prompt. Using `npx.cmd` instead of `npx` fixed it without changing any Windows
    settings.
-2. **The tests seemed stuck at `RUNS`.** It was not stuck: I had left my breakpoint on
-   line 29, and in the JavaScript Debug Terminal the debugger paused there. Line 29 runs
-   before every test, so it would have paused 6 times. I removed the breakpoint and pressed
-   Continue (F5). Now I use a normal terminal to just see results, and the Debug Terminal
-   only when I want to pause.
-3. **I fixed bug 1 before committing the buggy starter.** I put the bug back, committed the
+2. **I fixed bug 1 before committing the buggy starter.** I put the bug back, committed the
    starter, then re-applied the fix as its own commit, so the history shows the exact
    one-letter change. Later I forgot to commit bugs 2 and 3 separately, so they share a commit
    with bugs 4 and 5 (see the commit table above). Next time: commit right after each fix.
-4. **My first fix for bug 3 was wrong.** I removed `this.` like in bug 2, but `attack` has no
-   `weapon` input. Looking at `this` while paused showed the sword is in `equippedWeapon`.
-5. **I first looked in the wrong files.** I compared the end of the **test** files instead of
+3. **My first fix for bug 3 was wrong.** I removed `this.` like in bug 2, but `attack` has no
+   `weapon` input. The sword is stored as `equippedWeapon`.
+4. **I first looked in the wrong files.** I compared the end of the **test** files instead of
    `src/enemy.js` and `src/player.js`. The bugs are always in `src/`; the tests are the checker.
 
 ## What I learned
 
-- A breakpoint shows the real value, and it is often not what I assumed: `Player` looked
-  like it should be a function, but it was `{}`.
 - Read the stack trace first: what went wrong, and the first line in my own code.
 - Where an error **shows** is not always where it is **caused**.
 - One bug can hide others, so fix one, re-run, and read the next error.
@@ -321,20 +312,18 @@ The tests do not check these, and they do not break anything, so I did not chang
 
 ## Trickiest part
 
-Bug 2, because nothing crashed. The test just said `Received: undefined`. Only by stepping
-into `equip` could I see that the sword arrived correctly in `weapon`, and the line stored
-`this.weapon` instead, which looks almost the same but does not exist.
+Bug 2, because nothing crashed and there was no stack trace. The test just said
+`Received: undefined`, and only reading `equip` showed that it saved `this.weapon` instead of
+the `weapon` input, which looks almost the same but does not exist.
 
 ## For the status meeting: how I found each bug
 
-- **Bug 1:** All tests crashed with "Player is not a constructor". I paused on the line that
-  creates the player and hovered over `Player`: it was an empty object, not a function. An
-  empty object from `require` means the file did not export properly, and the export line
-  said `module.export` instead of `module.exports`.
-- **Bug 2:** No crash, just `undefined`. I paused on `player.equip(sword)` and used Step Into
-  to go inside `equip`. The sword was in the `weapon` input, but the code saved
-  `this.weapon`, which does not exist.
-- **Bug 3:** The stack trace pointed at `player.js` line 26. I paused there and opened
-  `this`: the sword was in `equippedWeapon`, not `weapon`.
+- **Bug 1:** All tests crashed with "Player is not a constructor", pointing at the line that
+  creates the player. `new` needs a function, and `require` gave something else, so I checked
+  the export line of `player.js`: `module.export` instead of `module.exports`.
+- **Bug 2:** No crash and no stack trace, just `Received: undefined`. I read `equip`: it saved
+  `this.weapon`, which does not exist, instead of the `weapon` input.
+- **Bug 3:** The stack trace pointed at `player.js` line 26, `reading 'damage'` of `undefined`.
+  The weapon is saved as `equippedWeapon`, not `weapon`.
 - Then the stack trace showed bugs 4 and 5 on the next lines, which I fixed by passing
   `target` through, the same way `enemy.js` does.

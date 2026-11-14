@@ -19,6 +19,9 @@ Enemy.prototype._describeAttack = function (target) {
 };
 
 Enemy.prototype.attack = function (target) {
+  if (target === null || typeof target !== 'object' || typeof target._takeDamage !== 'function') {
+    throw new TypeError('attack needs a target that can take damage');
+  }
   target._takeDamage(this.damage);
   return this._describeAttack(target);
 };

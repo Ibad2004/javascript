@@ -6,6 +6,10 @@ const stock = {
 };
 
 function sell(item, qty) {
+  if (qty <= 0) {
+    console.log("Quantity must be more than 0");
+    return;
+  }
   if (stock[item] === undefined) {
     console.log(`We don't sell ${item}`);
   } else if (stock[item] < qty) {
@@ -17,6 +21,10 @@ function sell(item, qty) {
 }
 
 function restock(item, qty) {
+  if (qty <= 0) {
+    console.log("Quantity must be more than 0");
+    return;
+  }
   stock[item] = (stock[item] || 0) + qty;
 }
 

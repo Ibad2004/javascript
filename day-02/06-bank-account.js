@@ -14,6 +14,10 @@ function deposit(acc, amount) {
 }
 
 function withdraw(acc, amount) {
+  if (amount <= 0) {
+    console.log("Withdrawal must be more than 0");
+    return;
+  }
   if (amount > acc.balance) {
     console.log(`Cannot withdraw ${amount}, balance is only ${acc.balance}`);
     return;

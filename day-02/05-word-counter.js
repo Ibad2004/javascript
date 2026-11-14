@@ -1,5 +1,9 @@
 function countWords(sentence) {
-  const words = sentence.toLowerCase().split(" ");
+  const words = sentence
+    .toLowerCase()
+    .split(/\s+/)
+    .map((word) => word.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ""))
+    .filter((word) => word !== "");
   const counts = {};
 
   for (const word of words) {

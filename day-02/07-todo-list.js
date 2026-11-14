@@ -30,6 +30,7 @@ function removeTodo(id) {
       return;
     }
   }
+  console.log(`No task with id ${id}`);
 }
 
 function printTodos() {

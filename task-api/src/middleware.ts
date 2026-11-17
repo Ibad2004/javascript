@@ -1,4 +1,5 @@
 import type { ErrorRequestHandler, RequestHandler } from "express";
+import mongoose from "mongoose";
 import { ApiError } from "./errors.js";
 
 export const requestLogger: RequestHandler = (req, res, next) => {
@@ -33,6 +34,19 @@ export const errorHandler: ErrorRequestHandler = (err: unknown, _req, res, next)
   }
   if (err instanceof ApiError) {
     res.status(err.status).json({ error: err.message });
+    return;
+  }
+  if (err instanceof mongoose.Error.ValidationError) {
+    const first = Object.values(err.errors)[0];
+    res.status(400).json({ error: first?.message ?? "Invalid task" });
+    return;
+  }
+  if (err instanceof mongoose.Error.CastError) {
+    res.status(400).json({ error: `${err.path} has an invalid value` });
+    return;
+  }
+  if (err instanceof mongoose.Error.MongooseServerSelectionError || (err instanceof Error && err.name.startsWith("MongoNetwork"))) {
+    res.status(503).json({ error: "Database unavailable, try again shortly" });
     return;
   }
   const type = bodyParserType(err);

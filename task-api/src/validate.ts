@@ -45,6 +45,19 @@ function dueDate(value: unknown): string | null {
   return value;
 }
 
+function tags(value: unknown): string[] {
+  if (!Array.isArray(value)) throw new ApiError(400, "tags must be an array of strings");
+  const cleaned: string[] = [];
+  for (const item of value) {
+    if (typeof item !== "string") throw new ApiError(400, "tags must be an array of strings");
+    const tag = item.trim();
+    if (tag.length < 1 || tag.length > 20) throw new ApiError(400, "tags must be 1 to 20 characters each");
+    if (!cleaned.includes(tag)) cleaned.push(tag);
+  }
+  if (cleaned.length > 10) throw new ApiError(400, "tags can have at most 10 items");
+  return cleaned;
+}
+
 function done(value: unknown): boolean {
   if (typeof value !== "boolean") throw new ApiError(400, "done must be true or false");
   return value;
@@ -57,6 +70,7 @@ export function parseNewTask(body: unknown): TaskInput {
     description: data["description"] === undefined ? "" : description(data["description"]),
     priority: data["priority"] === undefined ? "medium" : priority(data["priority"]),
     dueDate: data["dueDate"] === undefined ? null : dueDate(data["dueDate"]),
+    tags: data["tags"] === undefined ? [] : tags(data["tags"]),
   };
 }
 
@@ -67,9 +81,10 @@ export function parsePatch(body: unknown): TaskPatch {
   if (data["description"] !== undefined) patch.description = description(data["description"]);
   if (data["priority"] !== undefined) patch.priority = priority(data["priority"]);
   if (data["dueDate"] !== undefined) patch.dueDate = dueDate(data["dueDate"]);
+  if (data["tags"] !== undefined) patch.tags = tags(data["tags"]);
   if (data["done"] !== undefined) patch.done = done(data["done"]);
   if (Object.keys(patch).length === 0) {
-    throw new ApiError(400, "Send at least one of: title, description, priority, dueDate, done");
+    throw new ApiError(400, "Send at least one of: title, description, priority, dueDate, tags, done");
   }
   return patch;
 }

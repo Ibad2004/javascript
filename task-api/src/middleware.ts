@@ -1,6 +1,6 @@
 import type { ErrorRequestHandler, RequestHandler } from "express";
 import mongoose from "mongoose";
-import { ApiError } from "./errors.js";
+import { ApiError, ValidationError } from "./errors.js";
 
 export const requestLogger: RequestHandler = (req, res, next) => {
   if (process.env["NODE_ENV"] === "test") {
@@ -32,8 +32,17 @@ export const errorHandler: ErrorRequestHandler = (err: unknown, _req, res, next)
     next(err);
     return;
   }
+  if (err instanceof ValidationError) {
+    res.status(400).json({ error: err.message, fields: err.fields });
+    return;
+  }
   if (err instanceof ApiError) {
-    res.status(err.status).json({ error: err.message });
+    res.status(err.status).json(err.code ? { error: err.message, code: err.code } : { error: err.message });
+    return;
+  }
+  if (typeof err === "object" && err !== null && "code" in err && err.code === 11000) {
+    // The only unique index is User.email.
+    res.status(409).json({ error: "Email already registered" });
     return;
   }
   if (err instanceof mongoose.Error.ValidationError) {

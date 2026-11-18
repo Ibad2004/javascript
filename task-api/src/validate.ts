@@ -1,90 +1,62 @@
-import { ApiError } from "./errors.js";
-import type { Priority, TaskInput, TaskPatch } from "./types.js";
+import { z } from "zod";
+import { ValidationError, ApiError } from "./errors.js";
 
-const PRIORITIES: readonly string[] = ["low", "medium", "high"];
+const title = z.string({ error: "title must be a string" }).trim().min(1, "title must be 1 to 100 characters").max(100, "title must be 1 to 100 characters");
+const description = z.string({ error: "description must be a string" }).max(500, "description must be at most 500 characters");
+const priority = z.enum(["low", "medium", "high"], { error: "priority must be one of: low, medium, high" });
+const dueDate = z
+  .string({ error: 'dueDate must be null or a date like "2026-12-31"' })
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'dueDate must be null or a date like "2026-12-31"')
+  .refine((v) => {
+    const d = new Date(`${v}T00:00:00.000Z`);
+    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v; // Zod also runs this when the regex failed
+  }, "dueDate must be a real calendar date")
+  .nullable();
+const tags = z
+  .array(z.string({ error: "tags must be an array of strings" }).trim().min(1, "tags must be 1 to 20 characters each").max(20, "tags must be 1 to 20 characters each"), {
+    error: "tags must be an array of strings",
+  })
+  .transform((list) => [...new Set(list)])
+  .refine((list) => list.length <= 10, "tags can have at most 10 items");
+const done = z.boolean({ error: "done must be true or false" });
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+// Zod strips unknown keys, so `owner`, `id` and the like never get through.
+export const newTaskSchema = z.object({
+  title,
+  description: description.default(""),
+  priority: priority.default("medium"),
+  dueDate: dueDate.default(null),
+  tags: tags.default([]),
+});
 
-/** Without a JSON body (or with a non-JSON content type) Express 5 leaves req.body undefined. */
-function readBody(body: unknown): Record<string, unknown> {
-  if (!isRecord(body)) throw new ApiError(400, "Send the task as JSON");
-  return body;
-}
+export const patchSchema = z
+  .object({ title, description, priority, dueDate, tags, done })
+  .partial()
+  .refine((p) => Object.values(p).some((v) => v !== undefined), "Send at least one of: title, description, priority, dueDate, tags, done");
 
-function title(value: unknown): string {
-  if (typeof value !== "string") throw new ApiError(400, "title must be a string");
-  const trimmed = value.trim();
-  if (trimmed.length < 1 || trimmed.length > 100) {
-    throw new ApiError(400, "title must be 1 to 100 characters");
+export const signupSchema = z.object({
+  email: z.string({ error: "email must be a string" }).trim().toLowerCase().pipe(z.email("email must be a valid email")),
+  password: z
+    .string({ error: "password must be a string" })
+    .min(8, "password must be 8 to 72 characters")
+    .max(72, "password must be 8 to 72 characters")
+    // bcrypt only reads the first 72 BYTES, so reject longer multi-byte passwords too.
+    .refine((v) => Buffer.byteLength(v) <= 72, "password must be 8 to 72 characters"),
+});
+
+export const loginSchema = z.object({
+  email: z.string({ error: "email must be a string" }).trim().toLowerCase().min(1, "email is required"),
+  password: z.string({ error: "password must be a string" }).min(1, "password is required"),
+});
+
+export function parseBody<T extends z.ZodType>(schema: T, body: unknown, what = "data"): z.output<T> {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) throw new ApiError(400, `Send the ${what} as JSON`);
+  const result = schema.safeParse(body);
+  if (result.success) return result.data;
+  const fields: Record<string, string> = {};
+  for (const issue of result.error.issues) {
+    const key = String(issue.path[0] ?? "body");
+    fields[key] ??= issue.message;
   }
-  return trimmed;
-}
-
-function description(value: unknown): string {
-  if (typeof value !== "string") throw new ApiError(400, "description must be a string");
-  if (value.length > 500) throw new ApiError(400, "description must be at most 500 characters");
-  return value;
-}
-
-function priority(value: unknown): Priority {
-  if (value === "low" || value === "medium" || value === "high") return value;
-  throw new ApiError(400, `priority must be one of: ${PRIORITIES.join(", ")}`);
-}
-
-function dueDate(value: unknown): string | null {
-  if (value === null) return null;
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    throw new ApiError(400, 'dueDate must be null or a date like "2026-12-31"');
-  }
-  const date = new Date(`${value}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
-    throw new ApiError(400, "dueDate must be a real calendar date");
-  }
-  return value;
-}
-
-function tags(value: unknown): string[] {
-  if (!Array.isArray(value)) throw new ApiError(400, "tags must be an array of strings");
-  const cleaned: string[] = [];
-  for (const item of value) {
-    if (typeof item !== "string") throw new ApiError(400, "tags must be an array of strings");
-    const tag = item.trim();
-    if (tag.length < 1 || tag.length > 20) throw new ApiError(400, "tags must be 1 to 20 characters each");
-    if (!cleaned.includes(tag)) cleaned.push(tag);
-  }
-  if (cleaned.length > 10) throw new ApiError(400, "tags can have at most 10 items");
-  return cleaned;
-}
-
-function done(value: unknown): boolean {
-  if (typeof value !== "boolean") throw new ApiError(400, "done must be true or false");
-  return value;
-}
-
-export function parseNewTask(body: unknown): TaskInput {
-  const data = readBody(body);
-  return {
-    title: title(data["title"]),
-    description: data["description"] === undefined ? "" : description(data["description"]),
-    priority: data["priority"] === undefined ? "medium" : priority(data["priority"]),
-    dueDate: data["dueDate"] === undefined ? null : dueDate(data["dueDate"]),
-    tags: data["tags"] === undefined ? [] : tags(data["tags"]),
-  };
-}
-
-export function parsePatch(body: unknown): TaskPatch {
-  const data = readBody(body);
-  const patch: TaskPatch = {};
-  if (data["title"] !== undefined) patch.title = title(data["title"]);
-  if (data["description"] !== undefined) patch.description = description(data["description"]);
-  if (data["priority"] !== undefined) patch.priority = priority(data["priority"]);
-  if (data["dueDate"] !== undefined) patch.dueDate = dueDate(data["dueDate"]);
-  if (data["tags"] !== undefined) patch.tags = tags(data["tags"]);
-  if (data["done"] !== undefined) patch.done = done(data["done"]);
-  if (Object.keys(patch).length === 0) {
-    throw new ApiError(400, "Send at least one of: title, description, priority, dueDate, tags, done");
-  }
-  return patch;
+  throw new ValidationError(result.error.issues[0]?.message ?? "Invalid data", fields);
 }

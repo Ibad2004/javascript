@@ -1,5 +1,13 @@
 import { createApp } from "./app.js";
+import { ConfigError, loadJwtConfig } from "./config.js";
 import { connectDb, disconnectDb } from "./db.js";
+
+try {
+  loadJwtConfig();
+} catch (err) {
+  console.error(err instanceof ConfigError ? err.message : "Invalid configuration");
+  process.exit(1);
+}
 
 const uri = process.env["MONGODB_URI"];
 if (!uri) {

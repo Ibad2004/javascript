@@ -4,9 +4,12 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { connectDb, disconnectDb } from "../src/db.js";
 import { Task } from "../src/models/Task.js";
+import { User } from "../src/models/User.js";
+import { signToken } from "../src/auth.js";
 import { sampleTasks } from "../src/sampleTasks.js";
 
 process.env["NODE_ENV"] = "test";
+process.env["JWT_SECRET"] = "test-secret-test-secret-test-secret-123";
 const app = createApp((router) => {
   router.get("/boom", () => {
     throw new Error("secret internal detail");
@@ -19,12 +22,14 @@ const app = createApp((router) => {
 
 let mongod: MongoMemoryServer;
 let ids: string[] = [];
+let auth: [string, string] = ["Authorization", ""];
 const FAKE_ID = "64b7f0f2a1b2c3d4e5f60718";
 
 beforeAll(async () => {
   mongod = await MongoMemoryServer.create();
   await connectDb(mongod.getUri("task-test"));
   await Task.init();
+  await User.init();
 }, 120_000);
 
 afterAll(async () => {
@@ -34,7 +39,10 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await Task.deleteMany({});
-  const docs = await Task.insertMany(sampleTasks);
+  await User.deleteMany({});
+  const user = await User.create({ email: "a@example.com", passwordHash: "x" });
+  auth = ["Authorization", `Bearer ${signToken(user.id)}`];
+  const docs = await Task.insertMany(sampleTasks.map((t) => ({ ...t, owner: user._id })));
   ids = docs.map((d) => d.id as string);
 });
 
@@ -54,15 +62,15 @@ describe("health and 404", () => {
 
 describe("GET /tasks", () => {
   it("lists the seed tasks", async () => {
-    const res = await request(app).get("/tasks");
+    const res = await request(app).get("/tasks").set(...auth);
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(3);
   });
   it("gets one task, 404 for an unknown id", async () => {
-    const ok = await request(app).get(`/tasks/${ids[0]}`);
+    const ok = await request(app).get(`/tasks/${ids[0]}`).set(...auth);
     expect(ok.status).toBe(200);
     expect(ok.body.id).toBe(ids[0]);
-    const missing = await request(app).get(`/tasks/${FAKE_ID}`);
+    const missing = await request(app).get(`/tasks/${FAKE_ID}`).set(...auth);
     expect(missing.status).toBe(404);
     expect(missing.body).toEqual({ error: "Task not found" });
   });
@@ -70,14 +78,14 @@ describe("GET /tasks", () => {
 
 describe("POST /tasks", () => {
   it("creates with defaults, 201 and Location", async () => {
-    const res = await request(app).post("/tasks").send({ title: "  New  " });
+    const res = await request(app).post("/tasks").set(...auth).send({ title: "  New  " });
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({ title: "New", description: "", priority: "medium", dueDate: null, done: false });
     expect(res.headers["location"]).toBe(`/tasks/${res.body.id}`);
-    expect((await request(app).get(`/tasks/${res.body.id}`)).status).toBe(200);
+    expect((await request(app).get(`/tasks/${res.body.id}`).set(...auth)).status).toBe(200);
   });
   it("ignores unknown fields and a client id", async () => {
-    const res = await request(app).post("/tasks").send({ title: "x", id: "hack", extra: 1 });
+    const res = await request(app).post("/tasks").set(...auth).send({ title: "x", id: "hack", extra: 1 });
     expect(res.status).toBe(201);
     expect(res.body.id).not.toBe("hack");
     expect(res.body.extra).toBeUndefined();
@@ -91,7 +99,7 @@ describe("POST /tasks", () => {
     ["impossible date", { title: "x", dueDate: "2026-02-30" }, "dueDate"],
     ["long description", { title: "x", description: "a".repeat(501) }, "description"],
   ])("400 for %s", async (_name, body, field) => {
-    const res = await request(app).post("/tasks").send(body);
+    const res = await request(app).post("/tasks").set(...auth).send(body);
     expect(res.status).toBe(400);
     expect(res.body.error).toContain(field);
   });
@@ -99,44 +107,44 @@ describe("POST /tasks", () => {
 
 describe("PATCH /tasks/:id", () => {
   it("changes only the sent fields and never the id", async () => {
-    const res = await request(app).patch(`/tasks/${ids[1]}`).send({ done: true, id: "other" });
+    const res = await request(app).patch(`/tasks/${ids[1]}`).set(...auth).send({ done: true, id: "other" });
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ id: ids[1], done: true, title: "Write the middleware order" });
   });
   it("400 for an empty patch, 404 for an unknown id", async () => {
-    expect((await request(app).patch(`/tasks/${ids[1]}`).send({})).status).toBe(400);
-    expect((await request(app).patch(`/tasks/${FAKE_ID}`).send({ done: true })).status).toBe(404);
+    expect((await request(app).patch(`/tasks/${ids[1]}`).set(...auth).send({})).status).toBe(400);
+    expect((await request(app).patch(`/tasks/${FAKE_ID}`).set(...auth).send({ done: true })).status).toBe(404);
   });
 });
 
 describe("DELETE /tasks/:id", () => {
   it("204 then 404", async () => {
-    expect((await request(app).delete(`/tasks/${ids[0]}`)).status).toBe(204);
-    expect((await request(app).delete(`/tasks/${ids[0]}`)).status).toBe(404);
+    expect((await request(app).delete(`/tasks/${ids[0]}`).set(...auth)).status).toBe(204);
+    expect((await request(app).delete(`/tasks/${ids[0]}`).set(...auth)).status).toBe(404);
   });
 });
 
 describe("MongoDB features", () => {
   it("an invalid ObjectId is 404, never 500", async () => {
     for (const verb of ["get", "delete"] as const) {
-      const res = await request(app)[verb]("/tasks/999");
+      const res = await request(app)[verb]("/tasks/999").set(...auth).set(...auth);
       expect(res.status).toBe(404);
       expect(res.body).toEqual({ error: "Task not found" });
     }
-    expect((await request(app).patch("/tasks/not-an-id").send({ done: true })).status).toBe(404);
+    expect((await request(app).patch("/tasks/not-an-id").set(...auth).send({ done: true })).status).toBe(404);
   });
   it("tags are embedded, trimmed and de-duplicated", async () => {
-    const res = await request(app).post("/tasks").send({ title: "t", tags: [" a ", "a", "b"] });
+    const res = await request(app).post("/tasks").set(...auth).send({ title: "t", tags: [" a ", "a", "b"] });
     expect(res.status).toBe(201);
     expect(res.body.tags).toEqual(["a", "b"]);
-    const patched = await request(app).patch(`/tasks/${res.body.id}`).send({ tags: ["x"] });
+    const patched = await request(app).patch(`/tasks/${res.body.id}`).set(...auth).send({ tags: ["x"] });
     expect(patched.body.tags).toEqual(["x"]);
   });
   it("400 for too many or too long tags", async () => {
-    const many = await request(app).post("/tasks").send({ title: "t", tags: Array.from({ length: 11 }, (_, i) => `t${i}`) });
+    const many = await request(app).post("/tasks").set(...auth).send({ title: "t", tags: Array.from({ length: 11 }, (_, i) => `t${i}`) });
     expect(many.status).toBe(400);
     expect(many.body.error).toContain("tags");
-    const long = await request(app).post("/tasks").send({ title: "t", tags: ["a".repeat(21)] });
+    const long = await request(app).post("/tasks").set(...auth).send({ title: "t", tags: ["a".repeat(21)] });
     expect(long.status).toBe(400);
   });
   it("the model rejects bad data with a 400 naming the field", async () => {
@@ -145,14 +153,14 @@ describe("MongoDB features", () => {
     expect((res as Error).message).toContain("tags");
   });
   it("toJSON has id and no _id or __v", async () => {
-    const res = await request(app).get(`/tasks/${ids[0]}`);
+    const res = await request(app).get(`/tasks/${ids[0]}`).set(...auth);
     expect(typeof res.body.id).toBe("string");
     expect(res.body._id).toBeUndefined();
     expect(res.body.__v).toBeUndefined();
   });
   it("data survives a new app instance", async () => {
-    const created = await request(app).post("/tasks").send({ title: "persist" });
-    const again = await request(createApp()).get(`/tasks/${created.body.id}`);
+    const created = await request(app).post("/tasks").set(...auth).send({ title: "persist" });
+    const again = await request(createApp()).get(`/tasks/${created.body.id}`).set(...auth);
     expect(again.status).toBe(200);
     expect(again.body.title).toBe("persist");
   });
@@ -160,18 +168,18 @@ describe("MongoDB features", () => {
 
 describe("error handler", () => {
   it("invalid JSON is 400", async () => {
-    const res = await request(app).post("/tasks").set("Content-Type", "application/json").send("{bad");
+    const res = await request(app).post("/tasks").set(...auth).set("Content-Type", "application/json").send("{bad");
     expect(res.status).toBe(400);
     expect(res.body).toEqual({ error: "The body must be valid JSON" });
   });
   it("too large is 413", async () => {
-    const res = await request(app).post("/tasks").send({ title: "x", description: "a".repeat(11000) });
+    const res = await request(app).post("/tasks").set(...auth).send({ title: "x", description: "a".repeat(11000) });
     expect(res.status).toBe(413);
   });
   it("missing or non-JSON body is 400", async () => {
-    const none = await request(app).post("/tasks");
+    const none = await request(app).post("/tasks").set(...auth);
     expect(none.body).toEqual({ error: "Send the task as JSON" });
-    const text = await request(app).post("/tasks").set("Content-Type", "text/plain").send("hi");
+    const text = await request(app).post("/tasks").set(...auth).set("Content-Type", "text/plain").send("hi");
     expect(text.status).toBe(400);
   });
   it("a thrown error is 500 without a stack", async () => {
@@ -188,7 +196,7 @@ describe("error handler", () => {
 describe("database disconnected", () => {
   it("503 on /tasks, /health still 200", async () => {
     await disconnectDb();
-    const res = await request(app).get("/tasks");
+    const res = await request(app).get("/tasks").set(...auth);
     expect(res.status).toBe(503);
     expect(res.body).toEqual({ error: "Database unavailable, try again shortly" });
     expect((await request(app).get("/health")).status).toBe(200);

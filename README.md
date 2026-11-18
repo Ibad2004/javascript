@@ -90,6 +90,7 @@ npm start
 | 15 | Styling, basic accessibility, responsive layout: deployed on Vercel | [task-tracker](task-tracker/), [live demo](https://task-track-ibad.vercel.app/) |
 | 16 | Express + TypeScript API: routing, middleware order, error handling (in memory) | [task-api](task-api/) |
 | 17 | MongoDB Atlas + Mongoose: schemas, CRUD, embed vs reference, indexes | [task-api](task-api/) |
+| 18 | Auth: Zod validation, bcrypt, JWT, protected routes, per-user tasks | [task-api](task-api/) |
 
 Days 11 to 15 build one app, the [task tracker](task-tracker/) (Week 3). Its own README lists what
 each day adds. Days 12 to 15 are planned.

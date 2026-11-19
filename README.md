@@ -91,6 +91,7 @@ npm start
 | 16 | Express + TypeScript API: routing, middleware order, error handling (in memory) | [task-api](task-api/) |
 | 17 | MongoDB Atlas + Mongoose: schemas, CRUD, embed vs reference, indexes | [task-api](task-api/) |
 | 18 | Auth: Zod validation, bcrypt, JWT, protected routes, per-user tasks | [task-api](task-api/) |
+| 19 | Aggregation pipeline: stats per status, user and week, roles, SQL side by side | [task-api](task-api/) |
 
 Days 11 to 15 build one app, the [task tracker](task-tracker/) (Week 3). Its own README lists what
 each day adds. Days 12 to 15 are planned.

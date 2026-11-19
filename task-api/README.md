@@ -72,6 +72,8 @@ There are no refresh tokens yet.
 
 `npm run seed` creates `demo@example.com` / `DemoPass123`, gives it the sample tasks, and assigns Day 17 tasks that had no owner to it
 (nothing is deleted). Never use this account or password on a real deployment.
+It also creates `admin@example.com` / `AdminPass123` with `role: "admin"` (local demo only). Roles are `"user"` (default) or `"admin"`;
+signup ignores any `role` the client sends, so an admin can only be made in the database or by the seed.
 
 ### curl examples
 
@@ -104,6 +106,97 @@ CREATE TABLE task_tags (task_id int REFERENCES tasks(id) ON DELETE CASCADE, tag 
 ```
 
 In Mongo the `task_tags` rows become the `tags` array inside the task (no join); `user_id` becomes an ObjectId `ref`.
+
+## Stats
+
+Both routes need a token. `GET /stats?tz=Asia/Karachi` (default `UTC`; an unknown zone is 400) returns the caller's own numbers.
+`GET /stats/users` is admin only.
+
+**401 vs 403:** 401 = we do not know who you are (no, bad or expired token). 403 = we know who you are and you may not do this
+(a normal user on `/stats/users`: `{ "error": "Admins only", "code": "FORBIDDEN" }`).
+
+**Facet or separate pipelines?** `/stats` uses one `$facet` after `$match { owner }`: the three results come from one pass over
+the user's tasks and one index read, and the owner filter is written once, so no branch can forget it. Cost: a facet output is one
+document (16 MB limit; fine, we only return counts). `/stats/users` is its own pipeline because it starts from `users`.
+
+### byStatus + byPriority + byWeek (one `$facet`)
+
+```js
+Task.aggregate([
+  { $match: { owner } },                       // first stage: uses the { owner, done, dueDate } index
+  { $facet: {
+    status:   [{ $group: { _id: null, total: { $sum: 1 }, done: { $sum: { $cond: ["$done", 1, 0] } },
+                 overdue: { $sum: { $cond: [{ $and: [{ $eq: ["$done", false] }, { $eq: [{ $type: "$dueDate" }, "string"] },
+                                                      { $lt: ["$dueDate", today] }] }, 1, 0] } } } }],
+    priority: [{ $group: { _id: "$priority", n: { $sum: 1 } } }],
+    week:     [{ $addFields: { week: { $dateToString: { format: "%Y-%m-%d", timezone: tz,
+                 date: { $dateTrunc: { date: "$createdAt", unit: "week", startOfWeek: "monday", timezone: tz } } } } } },
+               { $match: { week: { $gte: oldestMonday } } },
+               { $group: { _id: "$week", n: { $sum: 1 } } }],
+  } },
+])
+```
+
+The same in Postgres (`tasks(owner_id, title, priority, due_date date, done, created_at timestamptz)`):
+
+```sql
+-- byStatus
+SELECT count(*)                                              AS total,
+       count(*) FILTER (WHERE done)                          AS done,
+       count(*) FILTER (WHERE NOT done)                      AS pending,
+       count(*) FILTER (WHERE NOT done AND due_date < (now() AT TIME ZONE :tz)::date) AS overdue
+FROM tasks WHERE owner_id = :me;
+
+-- byPriority
+SELECT priority, count(*) FROM tasks WHERE owner_id = :me GROUP BY priority;
+
+-- byWeek, last 8 weeks, empty weeks = 0
+SELECT w::date AS week, count(t.id) AS count
+FROM generate_series(date_trunc('week', now() AT TIME ZONE :tz) - interval '7 weeks',
+                     date_trunc('week', now() AT TIME ZONE :tz), interval '1 week') AS w
+LEFT JOIN tasks t ON t.owner_id = :me
+ AND date_trunc('week', t.created_at AT TIME ZONE :tz) = w
+GROUP BY w ORDER BY w;
+```
+
+Postgres `date_trunc('week', ...)` also starts on Monday. `created_at AT TIME ZONE :tz` turns a `timestamptz` into local time first,
+which is what `timezone: tz` does in `$dateTrunc`. Mongo has no `generate_series`, so the empty weeks are filled in the code
+(`weekList` in [src/stats.ts](src/stats.ts)); Mongo `dueDate` is a string, Postgres can use a real `date`.
+
+### Per-user report (admin)
+
+```js
+User.aggregate([
+  { $lookup: { from: "tasks", localField: "_id", foreignField: "owner",
+               pipeline: [{ $group: { _id: null, total: { $sum: 1 }, done: { $sum: { $cond: ["$done", 1, 0] } } } }], as: "s" } },
+  { $set: { s: { $ifNull: [{ $first: "$s" }, { total: 0, done: 0 }] } } },
+  { $project: { _id: 0, userId: { $toString: "$_id" }, email: 1, total: "$s.total", done: "$s.done",
+                pending: { $subtract: ["$s.total", "$s.done"] } } },   // listed fields only: no passwordHash
+  { $sort: { total: -1, email: 1 } },
+])
+```
+
+```sql
+SELECT u.id AS user_id, u.email,
+       count(t.id)                           AS total,
+       count(t.id) FILTER (WHERE t.done)     AS done,
+       count(t.id) FILTER (WHERE NOT t.done) AS pending
+FROM users u LEFT JOIN tasks t ON t.owner_id = u.id   -- LEFT JOIN keeps users with 0 tasks
+GROUP BY u.id, u.email
+ORDER BY total DESC, u.email;
+```
+
+I started from `users` (not from `$group` on tasks) so a user with no tasks still appears; the `$group` runs inside the `$lookup`.
+
+Example reply of `GET /stats?tz=Asia/Karachi`:
+
+```json
+{ "tz": "Asia/Karachi",
+  "byStatus": { "total": 4, "done": 1, "pending": 3, "overdue": 1 },
+  "byPriority": { "low": 1, "medium": 2, "high": 1 },
+  "byWeek": [ { "week": "2026-09-28", "count": 0 }, { "week": "2026-10-05", "count": 0 }, "... 6 more, oldest first ...",
+              { "week": "2026-11-16", "count": 3 } ] }
+```
 
 ## Middleware order and why
 
@@ -142,3 +235,8 @@ Invoke-RestMethod -Method Patch http://localhost:4000/tasks/1 -ContentType "appl
 - A bad `dueDate` such as `16/11/2026` returned 500: Zod 4 still runs a `.refine` after a failed `.regex`, and `toISOString()` threw
   `RangeError: Invalid time value`. The refine now checks for an invalid date first.
 - `npm ci` plus the first `npm run check` took more than two minutes on this machine (slow install), so the command ran in the background.
+
+## What broke on Day 19
+
+- Nothing failed: `npm run check` (47 tests) passed on the first run after the code was written.
+- Careful spot: `Intl.supportedValuesOf("timeZone")` does not list `UTC` on some Node versions, so `UTC` is added by hand.

@@ -2,6 +2,7 @@ import express, { type Express, type Router } from "express";
 import { errorHandler, notFound, requestLogger } from "./middleware.js";
 import { authRouter } from "./authRoutes.js";
 import { tasksRouter } from "./routes.js";
+import { statsRouter } from "./stats.js";
 
 /** `extraRoutes` is only for tests (to mount a route that throws). */
 export function createApp(extraRoutes?: (router: Router) => void): Express {
@@ -19,6 +20,7 @@ export function createApp(extraRoutes?: (router: Router) => void): Express {
   // 3 after the body is parsed; the first match answers the request.
   app.use("/auth", authRouter);
   app.use("/tasks", tasksRouter);
+  app.use("/stats", statsRouter);
   if (extraRoutes) {
     const router = express.Router();
     extraRoutes(router);

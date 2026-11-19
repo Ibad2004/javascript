@@ -60,3 +60,11 @@ export function parseBody<T extends z.ZodType>(schema: T, body: unknown, what = 
   }
   throw new ValidationError(result.error.issues[0]?.message ?? "Invalid data", fields);
 }
+
+const zones = new Set<string>([...Intl.supportedValuesOf("timeZone"), "UTC"]);
+export const statsQuerySchema = z.object({
+  tz: z
+    .string({ error: "tz must be an IANA time zone like Asia/Karachi" })
+    .refine((v) => zones.has(v), "tz must be an IANA time zone like Asia/Karachi")
+    .default("UTC"),
+});

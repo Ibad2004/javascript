@@ -8,6 +8,9 @@ import { sampleTasks } from "../src/sampleTasks.js";
 const DEMO_EMAIL = "demo@example.com";
 const DEMO_PASSWORD = "DemoPass123"; // local demo only, never use it anywhere real
 
+const ADMIN_EMAIL = "admin@example.com";
+const ADMIN_PASSWORD = "AdminPass123"; // local demo only
+
 const uri = process.env["MONGODB_URI"];
 if (!uri) {
   console.error("MONGODB_URI is missing. Copy .env.example to .env.");
@@ -18,6 +21,9 @@ try {
   const demo =
     (await User.findOne({ email: DEMO_EMAIL })) ??
     (await User.create({ email: DEMO_EMAIL, passwordHash: await bcrypt.hash(DEMO_PASSWORD, BCRYPT_COST) }));
+  if ((await User.exists({ email: ADMIN_EMAIL })) === null) {
+    await User.create({ email: ADMIN_EMAIL, role: "admin", passwordHash: await bcrypt.hash(ADMIN_PASSWORD, BCRYPT_COST) });
+  }
   // One-time fix for Day 17 tasks: no owner yet, so the demo user gets them. Nothing is deleted.
   const fixed = await Task.updateMany({ $or: [{ owner: { $exists: false } }, { owner: null }] }, { $set: { owner: demo._id } });
   console.log(`Demo user ready. Tasks given an owner: ${fixed.modifiedCount}.`);

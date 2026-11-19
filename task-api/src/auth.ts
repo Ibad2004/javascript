@@ -10,6 +10,7 @@ declare global {
   namespace Express {
     interface Request {
       userId?: string;
+      userRole?: "user" | "admin";
     }
   }
 }
@@ -41,9 +42,15 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
     if (err instanceof jwt.JsonWebTokenError) throw new ApiError(401, "Invalid token", "TOKEN_INVALID");
     throw err;
   }
-  if (typeof sub !== "string" || !mongoose.isValidObjectId(sub) || (await User.exists({ _id: sub })) === null) {
-    throw new ApiError(401, "Invalid token", "TOKEN_INVALID");
-  }
+  const user = typeof sub === "string" && mongoose.isValidObjectId(sub) ? await User.findById(sub).select("role") : null;
+  if (typeof sub !== "string" || user === null) throw new ApiError(401, "Invalid token", "TOKEN_INVALID");
   req.userId = sub;
+  req.userRole = user.role === "admin" ? "admin" : "user";
+  next();
+};
+
+/** Use after requireAuth. 401 = we don't know who you are; 403 = we know, and you may not. */
+export const requireAdmin: RequestHandler = (req, _res, next) => {
+  if (req.userRole !== "admin") throw new ApiError(403, "Admins only", "FORBIDDEN");
   next();
 };

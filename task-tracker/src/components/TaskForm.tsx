@@ -1,6 +1,7 @@
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent, KeyboardEvent, Ref } from 'react';
 import type { Priority, Task, TaskFormValues, TaskInput } from '../types';
+import { readDraft, removeDraft, writeDraft } from '../utils/drafts';
 import {
   DESCRIPTION_MAX,
   EMPTY_FORM_VALUES,
@@ -36,6 +37,11 @@ type TaskFormProps = {
   clearOnSubmit?: boolean;
   /** Edit form: put focus in the title when the form opens. */
   autoFocusTitle?: boolean;
+  /**
+   * When given, what the user types is kept in sessionStorage under this key and comes back
+   * when the form opens again (after a forced log-out). Removed on save and on cancel.
+   */
+  draftKey?: string;
   /** Lets the parent submit the form from outside (the "Save" in the unsaved-changes bar). */
   ref?: Ref<HTMLFormElement>;
 };
@@ -54,9 +60,11 @@ export function TaskForm({
   today,
   clearOnSubmit = false,
   autoFocusTitle = false,
+  draftKey,
   ref,
 }: TaskFormProps) {
-  const [values, setValues] = useState(initialValues);
+  const [restored] = useState(() => (draftKey === undefined ? null : readDraft(draftKey)));
+  const [values, setValues] = useState(restored ?? initialValues);
   // "Title is required" is shown only after the user tries to submit, not on an empty new form.
   const [triedSubmit, setTriedSubmit] = useState(false);
   // A half-typed date (e.g. "12/mm/2026") gives value "", but the browser sets validity.badInput.
@@ -73,6 +81,13 @@ export function TaskForm({
   const dueDateRef = useRef<HTMLInputElement>(null);
   const uid = useId();
 
+  // A restored draft differs from the saved task: tell the parent (the unsaved-changes bar).
+  useEffect(() => {
+    if (restored !== null) onDirtyChange?.(!sameValues(restored, initialValues));
+    // Only once, when the form opens.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const validation = validateTask(values, { tasks, today, editingId });
   const errors = { ...validation.errors };
   if (!triedSubmit && errors.title === MESSAGES.titleRequired) delete errors.title;
@@ -87,6 +102,10 @@ export function TaskForm({
     const next = { ...values, [field]: value };
     setValues(next);
     onDirtyChange?.(!sameValues(next, initialValues));
+    if (draftKey !== undefined) {
+      if (sameValues(next, initialValues)) removeDraft(draftKey);
+      else writeDraft(draftKey, next);
+    }
   }
 
   function handleDateChange(event: ChangeEvent<HTMLInputElement>) {
@@ -135,6 +154,7 @@ export function TaskForm({
       return;
     }
 
+    if (draftKey !== undefined) removeDraft(draftKey);
     if (clearOnSubmit) {
       setValues(EMPTY_FORM_VALUES);
       setTriedSubmit(false);
@@ -145,10 +165,15 @@ export function TaskForm({
     }
   }
 
+  function cancel() {
+    if (draftKey !== undefined) removeDraft(draftKey);
+    onCancel?.();
+  }
+
   function handleKeyDown(event: KeyboardEvent<HTMLFormElement>) {
     if (event.key === 'Escape' && onCancel !== undefined) {
       event.preventDefault();
-      onCancel();
+      cancel();
     }
   }
 
@@ -267,7 +292,7 @@ export function TaskForm({
           {isSaving ? 'Saving…' : submitLabel}
         </button>
         {onCancel !== undefined && (
-          <button type="button" onClick={onCancel}>
+          <button type="button" onClick={cancel}>
             Cancel
           </button>
         )}

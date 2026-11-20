@@ -8,6 +8,8 @@ coverage
 .env*
 !.env.example
 !.env.production
+!.env.development
+!.env.jsonserver
 
 # The live mock-API data (built from db.seed.json by npm run db:reset)
 db.json

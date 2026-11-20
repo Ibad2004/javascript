@@ -9,10 +9,11 @@ export type SourceEvent = { type: 'changed' } | { type: 'warning'; message: stri
  * localStorage (src/api/localTasks.ts) both provide it, so the hook never knows which one it has.
  */
 export type TasksSource = {
-  kind: 'api' | 'local';
+  kind: 'api' | 'local' | 'server';
   /** The header note: where the data lives. */
   where: string;
   getTasks: (signal?: AbortSignal) => Promise<LoadedTasks>;
+  /** The server source ignores task.id (the server makes ids) and returns the saved task. */
   createTask: (task: Task) => Promise<Task>;
   updateTask: (id: string, changedFields: TaskChanges) => Promise<Task>;
   deleteTask: (id: string) => Promise<void>;
@@ -20,11 +21,16 @@ export type TasksSource = {
   subscribe: (listener: (event: SourceEvent) => void) => () => void;
   /** Only the browser source can put the sample tasks back. */
   resetDemoData?: () => Promise<LoadedTasks>;
+  /** Only the real task-api has statistics. */
+  getStats?: (timeZone: string, signal?: AbortSignal) => Promise<Stats>;
 };
+
+export type Stats = { done: number; pending: number; overdue: number; thisWeek: number };
 
 export type SourceKind = TasksSource['kind'];
 
-/** VITE_DATA_SOURCE → which source. Anything but "local" (any case, spaces) means json-server. */
+/** VITE_DATA_SOURCE → which source. "local" or "server" (any case, spaces); anything else = json-server. */
 export function pickSourceKind(value: unknown): SourceKind {
-  return typeof value === 'string' && value.trim().toLowerCase() === 'local' ? 'local' : 'api';
+  const text = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return text === 'local' || text === 'server' ? text : 'api';
 }

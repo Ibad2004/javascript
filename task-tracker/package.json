@@ -8,9 +8,10 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:json": "vite --mode jsonserver",
     "api": "node scripts/db.mjs ensure && json-server --watch db.json --port 3001",
     "db:reset": "node scripts/db.mjs reset",
-    "start:all": "concurrently --names api,web --kill-others-on-fail \"npm run api\" \"npm run dev\"",
+    "start:all": "concurrently --names api,web --kill-others-on-fail \"npm run api\" \"npm run dev:json\"",
     "build": "tsc -b && vite build",
     "lint": "oxlint --deny-warnings",
     "format": "prettier --write .",

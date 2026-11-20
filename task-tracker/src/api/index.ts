@@ -1,4 +1,5 @@
 import { createLocalSource } from './localTasks';
+import { serverSource } from './serverApi';
 import { pickSourceKind, type TasksSource } from './source';
 import { createTask, deleteTask, getTasks, updateTask } from './tasks';
 
@@ -15,10 +16,12 @@ export const apiSource: TasksSource = {
 
 /**
  * The source the app uses, chosen at build time by VITE_DATA_SOURCE:
- * "api" (default, for local work with json-server) or "local" (.env.production, for Vercel).
+ * "server" (npm run dev: the real task-api), "api" (json-server) or "local" (.env.production, Vercel).
  */
 export function chooseSource(value: unknown): TasksSource {
-  return pickSourceKind(value) === 'local' ? createLocalSource() : apiSource;
+  const kind = pickSourceKind(value);
+  if (kind === 'local') return createLocalSource();
+  return kind === 'server' ? serverSource : apiSource;
 }
 
 export const defaultSource: TasksSource = chooseSource(import.meta.env.VITE_DATA_SOURCE);

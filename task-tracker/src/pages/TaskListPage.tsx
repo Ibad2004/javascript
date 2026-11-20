@@ -5,6 +5,7 @@ import { Notice } from '../components/Notice';
 import { TaskFilters } from '../components/TaskFilters';
 import { TaskForm } from '../components/TaskForm';
 import { TaskList } from '../components/TaskList';
+import { StatsBar } from '../components/StatsBar';
 import { TaskSummary } from '../components/TaskSummary';
 import { UndoBar } from '../components/UndoBar';
 import { useTasksContext } from '../context/TasksContext';
@@ -20,6 +21,7 @@ import {
   type Filters,
 } from '../utils/filters';
 import { focusIds } from '../utils/focusIds';
+import { ADD_DRAFT_KEY } from '../utils/drafts';
 import { pageTitle } from '../utils/pageTitle';
 import { pluralize } from '../utils/plural';
 import { getListStatusText } from '../utils/tasks';
@@ -44,6 +46,8 @@ export function TaskListPage({ today }: { today: string }) {
     toggleDone,
     canResetDemo,
     resetDemoData,
+    source,
+    dataVersion,
   } = useTasksContext();
   // The filters live in the URL (?status=done&priority=high&q=milk): reload, Back/Forward
   // and shared links keep them. The URL is the ONLY copy; nothing is mirrored in state.
@@ -146,6 +150,9 @@ export function TaskListPage({ today }: { today: string }) {
         {isReady && (
           <>
             <TaskSummary tasks={tasks} />
+            {source.getStats !== undefined && (
+              <StatsBar getStats={source.getStats} dataVersion={dataVersion} />
+            )}
             {skippedCount > 0 && (
               <p className="data-warning">
                 {pluralize(skippedCount, 'item')} in the saved data could not be read and{' '}
@@ -226,6 +233,7 @@ export function TaskListPage({ today }: { today: string }) {
             tasks={tasks}
             today={today}
             clearOnSubmit
+            {...(source.kind === 'server' ? { draftKey: ADD_DRAFT_KEY } : {})}
           />
         </section>
       )}

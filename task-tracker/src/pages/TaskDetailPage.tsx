@@ -11,6 +11,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import type { TaskInput } from '../types';
 import { focusIds } from '../utils/focusIds';
 import { filtersToSearch, readFilters } from '../utils/filters';
+import { editDraftKey, readDraft, removeDraft } from '../utils/drafts';
 import { pageTitle } from '../utils/pageTitle';
 import { toFormValues } from '../utils/tasks';
 
@@ -49,10 +50,15 @@ function TaskDetailView({ id, today }: { id: string; today: string }) {
     saveTask,
     removeTask,
     toggleDone,
+    source,
   } = useTasksContext();
+  // Drafts are kept only with the real server: a forced log-out must not lose what was typed.
+  const draftKey = source.kind === 'server' ? editDraftKey(id) : undefined;
   const navigate = useNavigate();
   const location = useLocation();
-  const [isEditing, setIsEditing] = useState(() => wantsEdit(location.state));
+  const [isEditing, setIsEditing] = useState(
+    () => wantsEdit(location.state) || (draftKey !== undefined && readDraft(draftKey) !== null),
+  );
   const [isDirty, setIsDirty] = useState(false);
   // Where the user tried to go while the form had unsaved changes.
   const [pendingTo, setPendingTo] = useState<string | null>(null);
@@ -80,6 +86,7 @@ function TaskDetailView({ id, today }: { id: string; today: string }) {
   }
 
   function stopEditing() {
+    if (draftKey !== undefined) removeDraft(draftKey);
     setIsEditing(false);
     setIsDirty(false);
     setPendingTo(null);
@@ -197,6 +204,7 @@ function TaskDetailView({ id, today }: { id: string; today: string }) {
                   editingId={task.id}
                   today={today}
                   autoFocusTitle
+                  {...(draftKey === undefined ? {} : { draftKey })}
                 />
               </>
             ) : (

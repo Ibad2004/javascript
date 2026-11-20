@@ -79,6 +79,8 @@ export function useTasks({ makeId = defaultMakeId, source = defaultSource }: Use
   const [notice, setNotice] = useState<string | null>(null);
   // A task the user just changed is hidden by the list's filters. Cleared like `notice`.
   const [filterNotice, setFilterNotice] = useState<FilterNotice | null>(null);
+  // Goes up after every saved change: the stats bar loads again when it changes.
+  const [dataVersion, setDataVersion] = useState(0);
   const [announcement, setAnnouncement] = useState<Announcement>({ text: '', id: 0 });
   // A new object every time, so asking twice for the same element still re-renders and focuses.
   const [focusRequest, setFocusRequest] = useState<{ elementId: string } | null>(null);
@@ -174,6 +176,10 @@ export function useTasks({ makeId = defaultMakeId, source = defaultSource }: Use
     requestFocus(focusIds.pageHeading);
   }
 
+  function bumpData() {
+    setDataVersion((n) => n + 1);
+  }
+
   function dismissNotice() {
     setNotice(null);
   }
@@ -241,6 +247,7 @@ export function useTasks({ makeId = defaultMakeId, source = defaultSource }: Use
     try {
       const saved = await createTask(newTask);
       setTasks((old) => [...old, saved]);
+      bumpData();
       announceResult('Task added', saved, hiddenBy);
       return null;
     } catch (error) {
@@ -271,6 +278,7 @@ export function useTasks({ makeId = defaultMakeId, source = defaultSource }: Use
         // "done" ticked while the form was open stays done (no lost update).
         const saved = await updateTaskOnServer(id, changes);
         setTasks((old) => replaceTask(old, saved));
+        bumpData();
       } catch (error) {
         if (isNotFound(error)) {
           removeMissingTask(id, onMissing);
@@ -302,6 +310,7 @@ export function useTasks({ makeId = defaultMakeId, source = defaultSource }: Use
 
     try {
       await deleteTaskOnServer(id);
+      bumpData();
     } catch (error) {
       if (isNotFound(error)) {
         removeMissingTask(id, onMissing);
@@ -330,7 +339,9 @@ export function useTasks({ makeId = defaultMakeId, source = defaultSource }: Use
 
     try {
       const saved = await createTask(task);
-      setTasks((old) => replaceTask(old, saved));
+      // The server may give the task a NEW id (task-api makes its own): swap by the OLD id.
+      setTasks((old) => old.map((t) => (t.id === task.id ? saved : t)));
+      bumpData();
     } catch (error) {
       setTasks((old) => deleteTask(old, task.id));
       // The Undo bar comes back, so the user can try again.
@@ -362,6 +373,7 @@ export function useTasks({ makeId = defaultMakeId, source = defaultSource }: Use
     try {
       const saved = await updateTaskOnServer(id, { done: nowDone });
       setTasks((old) => replaceTask(old, saved));
+      bumpData();
     } catch (error) {
       if (isNotFound(error)) {
         removeMissingTask(id, onMissing);
@@ -378,6 +390,9 @@ export function useTasks({ makeId = defaultMakeId, source = defaultSource }: Use
   return {
     /** The header note: "Saved on the local mock server (json-server)" or "Saved in this browser". */
     dataLocation: source.where,
+    /** Changes after every saved change; the stats bar listens to it. */
+    dataVersion,
+    source,
     canResetDemo: source.resetDemoData !== undefined,
     resetDemoData,
     loadState,

@@ -18,7 +18,16 @@ function readApiUrl(): string {
 
 export const API_URL = readApiUrl();
 
-export type ApiErrorKind = 'network' | 'timeout' | 'not-found' | 'server' | 'refused' | 'bad-data';
+export type ApiErrorKind =
+  | 'network'
+  | 'timeout'
+  | 'not-found'
+  | 'server'
+  | 'refused'
+  | 'bad-data'
+  | 'unauthorized'
+  | 'conflict'
+  | 'invalid';
 
 export const API_MESSAGES: Record<ApiErrorKind, string> = {
   network: "Can't reach the server. Is it running? (npm run api)",
@@ -27,18 +36,30 @@ export const API_MESSAGES: Record<ApiErrorKind, string> = {
   server: 'The server had a problem. Try again.',
   refused: 'The server refused the request.',
   'bad-data': "The server sent data the app can't read.",
+  unauthorized: 'Please log in again.',
+  conflict: 'That already exists.',
+  invalid: 'Some of the values are not valid.',
 };
 
 /** Every failed request ends as one of these. `message` is always safe to show. */
 export class ApiError extends Error {
   readonly kind: ApiErrorKind;
   readonly status: number | null;
+  /** Only the real task-api sends these: its error `code` and the Zod `fields` messages. */
+  readonly code: string | undefined;
+  readonly fields: Record<string, string>;
 
-  constructor(kind: ApiErrorKind, status: number | null = null) {
-    super(API_MESSAGES[kind]);
+  constructor(
+    kind: ApiErrorKind,
+    status: number | null = null,
+    extra: { message?: string; code?: string; fields?: Record<string, string> } = {},
+  ) {
+    super(extra.message ?? API_MESSAGES[kind]);
     this.name = 'ApiError';
     this.kind = kind;
     this.status = status;
+    this.code = extra.code;
+    this.fields = extra.fields ?? {};
   }
 }
 

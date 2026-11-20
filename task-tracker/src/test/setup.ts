@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
+import { resetAuthStoreForTests } from '../api/authStore';
 
 // Without Vitest globals, Testing Library cannot clean up by itself,
 // so unmount whatever each test rendered.
@@ -8,6 +9,12 @@ afterEach(() => {
   cleanup();
   // Removes the fetch spy (fake server) so no test sees another test's network.
   vi.restoreAllMocks();
+  // Login and drafts are kept in browser storage: one test must not log in the next one.
+  if (typeof window !== 'undefined') {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    resetAuthStoreForTests();
+  }
 });
 
 /**

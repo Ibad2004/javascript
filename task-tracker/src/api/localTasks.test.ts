@@ -212,7 +212,9 @@ describe('choosing the data source (VITE_DATA_SOURCE)', () => {
     [' LOCAL ', 'local'],
     ['api', 'api'],
     ['', 'api'],
-    ['server', 'api'],
+    ['server', 'server'],
+    [' SERVER ', 'server'],
+    ['json-server', 'api'],
     [undefined, 'api'],
     [42, 'api'],
   ])('%j → %s', (value, kind) => {

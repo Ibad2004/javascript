@@ -1,8 +1,8 @@
 # Task Tracker
 
 **Summary:** a small task tracker built with Vite + React + TypeScript over Days 11-15. You can add, edit,
-delete and filter tasks, open a task page, and see loading and error states. Locally the tasks are saved
-on a mock server (json-server); the live demo on Vercel saves them in the browser. Needs **Node 20.19+**.
+delete and filter tasks, open a task page, and see loading and error states. Since Day 20 `npm run dev` uses the real task-api (login). `npm run dev:json` still uses the
+mock server (json-server); the live demo on Vercel saves them in the browser. Needs **Node 20.19+**.
 Run `npm run check` (lint, tests, build) before a commit.
 
 **Contents:**
@@ -10,6 +10,7 @@ Run `npm run check` (lint, tests, build) before a commit.
 [Deploy (Vercel)](#deploy-vercel) ·
 [Component tree](#component-tree) ·
 [Props, state and context](#props-state-and-context) ·
+[Day 20](#day-20-the-tracker-uses-the-real-task-api-login-tokens-stats) ·
 [Day 15](#day-15-the-look-responsive-layout-accessibility-a-delete-dialog-and-the-deploy) ·
 [Day 14](#day-14-filters-a-task-page-and-a-usetasks-hook-react-router) ·
 [Demo script](#demo-script-2-minutes-on-a-phone) ·
@@ -24,13 +25,14 @@ Run `npm run check` (lint, tests, build) before a commit.
 A small task tracker built with **Vite + React + TypeScript**.
 This is a one-week project: every day I add to the **same app**.
 
-| Day | What the day adds                                                                                         | Status                                                  |
-| --- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| 11  | Tracker pages with **static data**: components, JSX, props, state                                         | Done                                                    |
-| 12  | Add, edit and delete tasks **in memory**: events, forms, controlled inputs, lists and keys                | Done                                                    |
-| 13  | Read tasks from a mock API (**json-server**): `useEffect`, fetching, loading and error states             | Done                                                    |
-| 14  | Filters, a task detail page and a `useTasks` hook: custom hooks, lifting state, context, **React Router** | Done                                                    |
-| 15  | Styling, basic accessibility and a responsive layout, then deploy on **Vercel**                           | Done ([live demo](https://task-track-ibad.vercel.app/)) |
+| Day | What the day adds                                                                                         | Status                                                                         |
+| --- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| 11  | Tracker pages with **static data**: components, JSX, props, state                                         | Done                                                                           |
+| 12  | Add, edit and delete tasks **in memory**: events, forms, controlled inputs, lists and keys                | Done                                                                           |
+| 13  | Read tasks from a mock API (**json-server**): `useEffect`, fetching, loading and error states             | Done                                                                           |
+| 14  | Filters, a task detail page and a `useTasks` hook: custom hooks, lifting state, context, **React Router** | Done                                                                           |
+| 15  | Styling, basic accessibility and a responsive layout, then deploy on **Vercel**                           | Done ([live demo](https://task-track-ibad.vercel.app/))                        |
+| 20  | The tracker uses the real **task-api**: login, Bearer token, protected routes, stats                      | Done ([Day 20](#day-20-the-tracker-uses-the-real-task-api-login-tokens-stats)) |
 
 **Live demo:** [https://task-track-ibad.vercel.app/](https://task-track-ibad.vercel.app/)
 
@@ -209,6 +211,129 @@ props. The filters are **not** React state at all: they live in the URL.
 State is never changed in place. Every update builds a new array or object with spread, `map`,
 `filter` or `toSpliced`, and the pure functions in `src/utils/tasks.ts` are tested on **frozen**
 arrays, so a mutation would throw in the test.
+
+## Day 20: the tracker uses the real task-api (login, tokens, stats)
+
+### Run the full app
+
+Two terminals (Windows PowerShell, `npm.cmd`):
+
+```powershell
+# terminal 1: the API (needs its .env with MONGODB_URI, JWT_SECRET, CORS_ORIGINS)
+cd task-api
+npm.cmd run dev                  # http://localhost:4000
+# terminal 2: the React app
+cd task-tracker
+npm.cmd run dev                  # http://localhost:5173 (uses the real API)
+```
+
+Demo account (made by `npm.cmd run seed` in task-api): **demo@example.com / DemoPass123**.
+Or press "Sign up" and make your own.
+
+### Three data sources, one interface
+
+| Source   | Chosen by                                                       | Login? | Used for                                  |
+| -------- | --------------------------------------------------------------- | ------ | ----------------------------------------- |
+| `server` | `VITE_DATA_SOURCE=server` (`.env.development`)                  | yes    | `npm run dev`: the real task-api          |
+| `api`    | `VITE_DATA_SOURCE=api` (`npm run dev:json`, with `npm run api`) | no     | the old json-server (Day 13)              |
+| `local`  | `VITE_DATA_SOURCE=local` (`.env.production`)                    | no     | the Vercel build: tasks in `localStorage` |
+
+All three give `getTasks`, `createTask`, `updateTask`, `deleteTask`. `server` also has login,
+signup, `/auth/me` and `getStats`, all in `src/api/serverApi.ts` (the only file that calls `fetch` for
+it; it keeps the 8 s timeout, the type guards and the friendly messages). The production build stays
+`local`, so the live site has no login and keeps working. `VITE_API_URL` changes the address
+(default `http://localhost:4000`).
+
+### The auth flow
+
+1. `/login` or `/signup` → `POST /auth/login` or `/auth/signup` → `{ user, token }`.
+2. The app saves `{ token, email }` in `localStorage` under `task-tracker:auth` (in memory if storage is blocked).
+3. Every request sends `Authorization: Bearer <token>`.
+4. On start, a saved token is checked with `GET /auth/me`. A 401 clears it and shows the login page.
+5. Any 401 later (`TOKEN_EXPIRED`, `TOKEN_INVALID`, `AUTH_REQUIRED`) ends the session. `TOKEN_EXPIRED`
+   shows "Your session expired. Please log in again."; the page you were on is kept as `?from=`.
+6. Every page except `/login` and `/signup` is behind `RequireAuth`. After login the app goes back to
+   `from`, but only if it is a path inside the app (one leading `/`; `//evil.com`, `https://…` and
+   backslash tricks become `/`): that is the open-redirect guard (`src/utils/redirect.ts`).
+7. A half-typed add/edit form is saved in `sessionStorage` while you type and comes back after you log in
+   again. "Log out" deletes these drafts; a forced log-out (401) keeps them.
+8. Log out (and log in) change the `key` of the tasks provider, so **all** data of the old user
+   (tasks, stats, notices, Undo) is dropped before the next user's page renders. Two tabs stay in sync
+   through the `storage` event on the auth key.
+
+### Ids and Undo with a server that makes ids
+
+task-api makes the id, so "add" waits for the server and uses the task it returns. Undo after a delete
+**re-creates** the task with `POST`, which gives it a **new id**; the list swaps the old row for the
+returned task, so it can be edited and deleted afterwards (tested). I chose re-create over a "delayed
+delete" (waiting 5 s before sending `DELETE`) because a delayed delete loses the delete if the tab is
+closed, the user logs out, or the token expires inside those seconds, and the stats would be wrong
+for 5 s. Cost of re-create: the restored task gets a new `createdAt`, so after a reload it is at the end
+of the server's order; the page shows it in its old place until then.
+
+### Stats bar
+
+`GET /stats?tz=<browser time zone>` → "3 done · 2 pending · 1 overdue · 4 this week" on the list page
+(server mode only). It loads again after add, edit, done and delete. If it fails: "Stats unavailable";
+the list still works.
+
+### CORS
+
+The browser (`http://localhost:5173`) and the API (`http://localhost:4000`) are different origins.
+The API only answers browsers from the origins in its `CORS_ORIGINS` setting. A CORS block looks like
+a network error to the page (`fetch` just fails), so the "Can't reach the server" message also says to
+check `CORS_ORIGINS`.
+
+### Security notes
+
+- A token in `localStorage` can be read by any script on the page (XSS). An **httpOnly cookie** cannot
+  be read by scripts, so it is safer against XSS (but then needs CSRF protection).
+- This course uses a **Bearer token** because task-api is a separate origin that any client can call
+  (curl, tests) with one header, and the cookie route would add CSRF, SameSite and credentialed-CORS
+  work. React escapes text by default, the app never uses `dangerouslySetInnerHTML`, and tokens expire
+  after `JWT_EXPIRES_IN`.
+- The login error never says whether the email or the password was wrong.
+- Passwords are never stored in the browser, only the token and the email.
+
+### Tests (Day 20)
+
+`src/App.auth.test.tsx` (21 tests, a fake task-api behind `fetch`): login and the Bearer header, wrong
+password, double click, signup (rule, show/hide, 409, API `fields`, short password), protected route →
+login → `from`, the open-redirect guard, already-logged-in redirect, `TOKEN_EXPIRED` with the draft
+restored, a bad saved token at start, log out clears everything and B never sees A (even while B's
+list is loading), two-tab logout and login, stats and a stats failure, server ids, Undo then edit,
+the API off, the local mode (no login), axe on login and signup.
+
+Old tests that changed meaning: `localTasks.test.ts` "choosing the data source" (`"server"` used to mean
+json-server; now it is its own source, and `"json-server"` → `api`); `test/setup.ts` now also clears
+`localStorage`, `sessionStorage` and the login between tests. All other old tests are unchanged.
+
+### What broke on Day 20
+
+- The shared test `setup.ts` called `window.localStorage` in the Node-environment seed tests:
+  `window is not defined`. Fixed with a `typeof window` check.
+- The old test that said `"server"` is json-server failed once `server` became a real source (updated, above).
+- My first auth tests assumed the wrong order: the list shows undone tasks first, so Alpha (done) comes
+  after Beta. The test was wrong, not the app.
+- The login page could keep the last email and password after a logout (the browser's autofill and a form
+  that was not remounted). The auth pages now get a `key` that changes at every login and logout, and
+  the fields use `username` / `current-password` (login) and `email` / `new-password` (signup).
+- In Edge the password field has its own eye icon, which vanished when our toggle made the field
+  `type="text"`, so two eyes fought. The built-in `::-ms-reveal` and `::-ms-clear` are hidden in CSS;
+  only our button (an inline SVG eye / eye with a slash, `aria-pressed`) is left. The toggle keeps
+  focus and the cursor, and the password goes back to hidden on submit.
+- Some messages are on the page twice (the visible error and its live-region copy), so `getByText` found
+  two elements. The tests now say which one they mean.
+
+### Full demo script (3 minutes, status meeting)
+
+1. **(0:00)** Terminal 1: `npm run dev` in task-api. Terminal 2: `npm run dev` in task-tracker. Open `localhost:5173`: it goes to `/login?from=%2F` (protected route).
+2. **(0:20)** Log in with a wrong password → "Invalid email or password". Then `demo@example.com / DemoPass123` → the list, the email and "Log out" in the header, the **stats bar**.
+3. **(0:50)** Add a task → stats change. Tick one done → stats change. Delete one → **Undo** → open the restored task and edit it (it has a new id from the server).
+4. **(1:30)** Expired token: start task-api with `JWT_EXPIRES_IN=30s` beforehand (or wait for it), type half a task, click Add → login page with "Your session expired". Log in again → back on the same page with the draft still in the form.
+5. **(2:05)** Open a second tab, **Log out** in tab 1 → tab 2 goes to the login page by itself. Sign up as a new user: the list is empty (user B never sees user A's tasks).
+6. **(2:35)** Stop task-api → "Can't reach the server… check CORS_ORIGINS" + Try again. Start it, press Try again.
+7. **(2:50)** Show the live Vercel site: same app, no login (local mode).
 
 ## Day 15: the look, responsive layout, accessibility, a delete dialog and the deploy
 

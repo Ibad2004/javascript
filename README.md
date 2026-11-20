@@ -71,27 +71,28 @@ npm start
 
 ## Progress
 
-| Day | Topic | Folder |
-| --- | --- | --- |
-| 01 | Environment setup, first script | [day-01](day-01/) |
-| 02 | JS basics: let/const, functions, arrow functions, objects, arrays | [day-02](day-02/) |
-| 03 | Array methods, destructuring, spread/rest | [day-03](day-03/) |
-| 04 | Modules, closures, this | [day-04](day-04/) |
-| 05 | Event loop, timers, debounce and throttle | [day-05](day-05/) |
-| 06 | Promises, async/await, fetch, error handling | [day-06](day-06/) |
-| 07 | Debugging: breakpoints, Node inspector, stack traces | [day-07](day-07/) |
-| 08 | TypeScript: types, interfaces, unions, generics, narrowing | [day-08](day-08/) |
-| 09 | npm, scripts, ESLint, Prettier: expense-tracker CLI | [day-09](day-09/) |
-| 10 | Pull requests and code review: expense-tracker improvements | [day-10](day-10/) |
-| 11 | React with Vite + TypeScript: components, JSX, props and state (static data) | [task-tracker](task-tracker/) |
-| 12 | Events, forms, controlled inputs, lists and keys: add, edit and delete tasks (in memory) | [task-tracker](task-tracker/) |
-| 13 | useEffect, fetching, loading and error states: read tasks from a mock API (json-server) | [task-tracker](task-tracker/) |
-| 14 | Custom hooks, lifting state, context, React Router: filters, a task detail page, a useTasks hook | [task-tracker](task-tracker/) |
-| 15 | Styling, basic accessibility, responsive layout: deployed on Vercel | [task-tracker](task-tracker/), [live demo](https://task-track-ibad.vercel.app/) |
-| 16 | Express + TypeScript API: routing, middleware order, error handling (in memory) | [task-api](task-api/) |
-| 17 | MongoDB Atlas + Mongoose: schemas, CRUD, embed vs reference, indexes | [task-api](task-api/) |
-| 18 | Auth: Zod validation, bcrypt, JWT, protected routes, per-user tasks | [task-api](task-api/) |
-| 19 | Aggregation pipeline: stats per status, user and week, roles, SQL side by side | [task-api](task-api/) |
+| Day | Topic                                                                                            | Folder                                                                          |
+| --- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| 01  | Environment setup, first script                                                                  | [day-01](day-01/)                                                               |
+| 02  | JS basics: let/const, functions, arrow functions, objects, arrays                                | [day-02](day-02/)                                                               |
+| 03  | Array methods, destructuring, spread/rest                                                        | [day-03](day-03/)                                                               |
+| 04  | Modules, closures, this                                                                          | [day-04](day-04/)                                                               |
+| 05  | Event loop, timers, debounce and throttle                                                        | [day-05](day-05/)                                                               |
+| 06  | Promises, async/await, fetch, error handling                                                     | [day-06](day-06/)                                                               |
+| 07  | Debugging: breakpoints, Node inspector, stack traces                                             | [day-07](day-07/)                                                               |
+| 08  | TypeScript: types, interfaces, unions, generics, narrowing                                       | [day-08](day-08/)                                                               |
+| 09  | npm, scripts, ESLint, Prettier: expense-tracker CLI                                              | [day-09](day-09/)                                                               |
+| 10  | Pull requests and code review: expense-tracker improvements                                      | [day-10](day-10/)                                                               |
+| 11  | React with Vite + TypeScript: components, JSX, props and state (static data)                     | [task-tracker](task-tracker/)                                                   |
+| 12  | Events, forms, controlled inputs, lists and keys: add, edit and delete tasks (in memory)         | [task-tracker](task-tracker/)                                                   |
+| 13  | useEffect, fetching, loading and error states: read tasks from a mock API (json-server)          | [task-tracker](task-tracker/)                                                   |
+| 14  | Custom hooks, lifting state, context, React Router: filters, a task detail page, a useTasks hook | [task-tracker](task-tracker/)                                                   |
+| 15  | Styling, basic accessibility, responsive layout: deployed on Vercel                              | [task-tracker](task-tracker/), [live demo](https://task-track-ibad.vercel.app/) |
+| 16  | Express + TypeScript API: routing, middleware order, error handling (in memory)                  | [task-api](task-api/)                                                           |
+| 17  | MongoDB Atlas + Mongoose: schemas, CRUD, embed vs reference, indexes                             | [task-api](task-api/)                                                           |
+| 18  | Auth: Zod validation, bcrypt, JWT, protected routes, per-user tasks                              | [task-api](task-api/)                                                           |
+| 19  | Aggregation pipeline: stats per status, user and week, roles, SQL side by side                   | [task-api](task-api/)                                                           |
+| 20  | React tracker on the real API: login, Bearer token, protected routes, stats, CORS                | [task-tracker](task-tracker/)                                                   |
 
 Days 11 to 15 build one app, the [task tracker](task-tracker/) (Week 3). Its own README lists what
 each day adds. Days 12 to 15 are planned.

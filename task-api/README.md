@@ -240,3 +240,10 @@ Invoke-RestMethod -Method Patch http://localhost:4000/tasks/1 -ContentType "appl
 
 - Nothing failed: `npm run check` (47 tests) passed on the first run after the code was written.
 - Careful spot: `Intl.supportedValuesOf("timeZone")` does not list `UTC` on some Node versions, so `UTC` is added by hand.
+
+## CORS
+
+Browsers block a page on one origin (the React tracker, `http://localhost:5173`) from reading replies of another (this API, port 3000) unless the API sends CORS headers.
+Only the origins in `CORS_ORIGINS` (comma-separated, default `http://localhost:5173,http://127.0.0.1:5173`) get them; any other origin gets none, so its browser blocks it.
+curl and PowerShell send no `Origin`, so they still work. Auth is a Bearer token, so credentials/cookies are off.
+`cors` is the first middleware so every reply, including 400/401/403/404/500, carries the header and the tracker can read the error message; it also answers preflight `OPTIONS` with 204 before auth runs.

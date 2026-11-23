@@ -1,0 +1,125 @@
+/*
+ * Design tokens: the ONLY file with colour values. Every other CSS file uses var(--...).
+ * src/styles/styles.test.ts checks both rules: no raw colours elsewhere, and every text
+ * colour pair below reaches 4.5:1 contrast (3:1 for borders and the focus ring) in both themes.
+ */
+:root {
+  color-scheme: light dark;
+
+  /* Fonts. The Arabic-script fonts come before the generic sans-serif: on Linux the fallback
+     (DejaVu Sans) has no bold "ہ", so Urdu titles showed empty boxes (Day 12). */
+  --font-sans:
+    system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', 'Noto Sans Arabic',
+    'Noto Naskh Arabic', 'Segoe UI Historic', sans-serif;
+
+  /* Font sizes (rem, so they follow the browser's text size and zoom). */
+  --text-xs: 0.8125rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.625rem;
+  --line-height: 1.5;
+
+  /* Spacing scale. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+
+  /* Shapes and sizes. */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-pill: 999px;
+  --touch-target: 2.75rem; /* 44 px at the default text size */
+  --content-max: 72rem;
+  --focus-width: 3px;
+
+  /* Light theme colours. */
+  --color-bg: #f5f6f8;
+  --color-surface: #ffffff;
+  --color-surface-muted: #eef1f5;
+  --color-text: #1a1f29;
+  --color-text-muted: #4a5462;
+  --color-border: #d5dae1;
+  --color-border-strong: #6b7584;
+  --color-primary: #1d4ed8;
+  --color-primary-hover: #1e40af;
+  --color-on-primary: #ffffff;
+  --color-danger: #b42318;
+  --color-danger-hover: #912018;
+  --color-on-danger: #ffffff;
+  --color-danger-bg: #fdecea;
+  --color-danger-text: #7a1b14;
+  --color-warning-bg: #fff7e0;
+  --color-warning-text: #7a4a00;
+  --color-warning-border: #b7791f;
+  --color-inverse-bg: #1f2937;
+  --color-inverse-text: #ffffff;
+  --color-focus: #1d4ed8;
+  --color-focus-on-inverse: #93c5fd;
+  --badge-high-bg: #fde2e1;
+  --badge-high-text: #8a1c14;
+  --badge-medium-bg: #fdf0cf;
+  --badge-medium-text: #6e4300;
+  --badge-low-bg: #e7ebf0;
+  --badge-low-text: #364152;
+  --priority-high: #c0362c;
+  --priority-medium: #b7791f;
+  --priority-low: #7a8494;
+
+  /* Shadows. */
+  --shadow-card: 0 1px 2px #1a1f2914, 0 1px 3px #1a1f290f;
+  --shadow-dialog: 0 12px 32px #1a1f2940;
+  --transition-fast: 120ms ease-out;
+}
+
+/* The backdrop of a modal <dialog> gets its own copy (older browsers do not inherit into it). */
+:root,
+::backdrop {
+  --color-backdrop: #0f172ab3;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0f141b;
+    --color-surface: #171e28;
+    --color-surface-muted: #212a36;
+    --color-text: #e7eaf0;
+    --color-text-muted: #a9b3c1;
+    --color-border: #313c4b;
+    --color-border-strong: #8994a4;
+    --color-primary: #8ab4ff;
+    --color-primary-hover: #b0ccff;
+    --color-on-primary: #0b1220;
+    --color-danger: #ff9b92;
+    --color-danger-hover: #ffbdb7;
+    --color-on-danger: #1d0907;
+    --color-danger-bg: #3b1714;
+    --color-danger-text: #ffcdc8;
+    --color-warning-bg: #3a2b0c;
+    --color-warning-text: #f8d48b;
+    --color-warning-border: #d9a441;
+    --color-inverse-bg: #e7eaf0;
+    --color-inverse-text: #111827;
+    --color-focus: #8ab4ff;
+    --color-focus-on-inverse: #1d4ed8;
+    --badge-high-bg: #4a1d1a;
+    --badge-high-text: #ffcdc8;
+    --badge-medium-bg: #45340f;
+    --badge-medium-text: #fadb92;
+    --badge-low-bg: #2a3442;
+    --badge-low-text: #d7dde6;
+    --priority-high: #ff8a80;
+    --priority-medium: #e0ac4a;
+    --priority-low: #8f9aab;
+    --shadow-card: 0 1px 2px #00000066;
+    --shadow-dialog: 0 12px 32px #000000a6;
+  }
+
+  :root,
+  ::backdrop {
+    --color-backdrop: #000000c2;
+  }
+}

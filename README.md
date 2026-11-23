@@ -93,6 +93,7 @@ npm start
 | 18  | Auth: Zod validation, bcrypt, JWT, protected routes, per-user tasks                              | [task-api](task-api/)                                                           |
 | 19  | Aggregation pipeline: stats per status, user and week, roles, SQL side by side                   | [task-api](task-api/)                                                           |
 | 20  | React tracker on the real API: login, Bearer token, protected routes, stats, CORS                | [task-tracker](task-tracker/)                                                   |
+| 21  | Next.js App Router: routing, layouts, route groups, server vs client components (static data)    | [task-tracker-next](task-tracker-next/)                                         |
 
 Days 11 to 15 build one app, the [task tracker](task-tracker/) (Week 3). Its own README lists what
 each day adds. Days 12 to 15 are planned.

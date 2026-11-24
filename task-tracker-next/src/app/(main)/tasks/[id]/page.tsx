@@ -19,7 +19,7 @@ export default async function TaskPage({ params }: Props) {
   return (
     <main id="main">
       <p>
-        <Link href="/">← Back to tasks</Link>
+        <Link href="/tasks">← Back to tasks</Link>
       </p>
       <section className="panel" aria-labelledby="task-heading">
         <h1 id="task-heading" dir="auto">

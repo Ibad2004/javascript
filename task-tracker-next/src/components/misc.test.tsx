@@ -24,7 +24,7 @@ describe("TaskList empty states", () => {
   it("offers Clear filters when nothing matches", () => {
     render(<TaskList tasks={[]} totalCount={3} />);
     expect(screen.getByText(/No tasks match these filters/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Clear filters" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "Clear filters" })).toHaveAttribute("href", "/tasks");
   });
 
   it("renders a link per task with dir=auto titles", () => {

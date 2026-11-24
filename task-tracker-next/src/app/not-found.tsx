@@ -9,7 +9,7 @@ export default function NotFound() {
       <h1>Page not found</h1>
       <p>We could not find that page.</p>
       <p>
-        <Link href="/">Go back home</Link>
+        <Link href="/tasks">Back to your tasks</Link>
       </p>
     </main>
   );

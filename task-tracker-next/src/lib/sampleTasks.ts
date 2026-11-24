@@ -1,3 +1,4 @@
+import "server-only";
 import { addDays, toLocalDateString } from "@/lib/dates";
 import type { Task } from "@/types";
 

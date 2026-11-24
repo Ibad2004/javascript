@@ -22,7 +22,7 @@ export default function Page() {
         </form>
         <p>Already have an account? <Link href="/login">Log in</Link></p>
         <p>
-          <Link href="/">Back to tasks</Link>
+          <Link href="/tasks">Back to tasks</Link>
         </p>
       </section>
     </main>

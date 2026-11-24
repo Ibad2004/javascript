@@ -9,7 +9,7 @@ export default function Page() {
     <main id="main" className="auth-page">
       <section className="panel" aria-labelledby="auth-heading">
         <h1 id="auth-heading">Log in</h1>
-        <p className="notice-info">Login works on Day 24</p>
+        <p className="notice-info">Login is coming later. This form does not work yet.</p>
         <form className="task-form" noValidate>
           <label htmlFor="auth-email">Email</label>
           <input id="auth-email" name="email" type="email" autoComplete="username" />
@@ -22,7 +22,7 @@ export default function Page() {
         </form>
         <p>No account yet? <Link href="/signup">Sign up</Link></p>
         <p>
-          <Link href="/">Back to tasks</Link>
+          <Link href="/tasks">Back to tasks</Link>
         </p>
       </section>
     </main>

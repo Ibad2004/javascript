@@ -14,7 +14,7 @@ export function TaskList({ tasks, totalCount }: TaskListProps) {
   if (tasks.length === 0) {
     return (
       <p className="no-match">
-        No tasks match these filters. <Link href="/">Clear filters</Link>
+        No tasks match these filters. <Link href="/tasks">Clear filters</Link>
       </p>
     );
   }

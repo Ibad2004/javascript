@@ -6,7 +6,7 @@ let query = "";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace }),
-  usePathname: () => "/",
+  usePathname: () => "/tasks",
   useSearchParams: () => new URLSearchParams(query),
 }));
 
@@ -25,7 +25,7 @@ describe("SearchBox", () => {
       vi.advanceTimersByTime(300);
     });
     expect(replace).toHaveBeenCalledTimes(1);
-    expect(replace).toHaveBeenCalledWith("/?q=c%2B%2B", { scroll: false });
+    expect(replace).toHaveBeenCalledWith("/tasks?q=c%2B%2B", { scroll: false });
   });
 
   it("keeps the other filters and drops q when cleared", () => {
@@ -37,6 +37,6 @@ describe("SearchBox", () => {
     act(() => {
       vi.advanceTimersByTime(300);
     });
-    expect(replace).toHaveBeenCalledWith("/?status=done", { scroll: false });
+    expect(replace).toHaveBeenCalledWith("/tasks?status=done", { scroll: false });
   });
 });

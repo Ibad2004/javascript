@@ -50,7 +50,7 @@ export function formatDueDate(dueDate: string | null): string {
   return `${parts.day} ${monthName} ${parts.year}`;
 }
 
-export type DueStatus = 'none' | 'overdue' | 'today' | 'scheduled';
+export type DueStatus = 'none' | 'overdue' | 'today' | 'tomorrow' | 'scheduled';
 
 /**
  * Compares the due date with `today` ("YYYY-MM-DD", the user's local date).
@@ -65,6 +65,7 @@ export function getDueStatus(
   if (task.done) return 'scheduled';
   if (task.dueDate < today) return 'overdue';
   if (task.dueDate === today) return 'today';
+  if (task.dueDate === addDays(today, 1)) return 'tomorrow';
   return 'scheduled';
 }
 
@@ -81,6 +82,8 @@ export function getDueLabel(
       return `Overdue (was due ${date})`;
     case 'today':
       return 'Due today';
+    case 'tomorrow':
+      return 'Due tomorrow';
     case 'scheduled':
       return `Due ${date}`;
   }

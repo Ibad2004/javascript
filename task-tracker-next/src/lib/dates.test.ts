@@ -81,8 +81,18 @@ describe('getDueStatus (with a fake today of 2026-11-10)', () => {
     expect(getDueStatus({ done: false, dueDate: '2026-11-10' }, FAKE_TODAY)).toBe('today');
   });
 
-  it('is "scheduled" for a future date', () => {
-    expect(getDueStatus({ done: false, dueDate: '2026-11-11' }, FAKE_TODAY)).toBe('scheduled');
+  it('is "tomorrow" for the next day, also across a month end', () => {
+    expect(getDueStatus({ done: false, dueDate: '2026-11-11' }, FAKE_TODAY)).toBe('tomorrow');
+    expect(getDueStatus({ done: false, dueDate: '2026-12-01' }, '2026-11-30')).toBe('tomorrow');
+  });
+
+  it('is "scheduled" for a later date', () => {
+    expect(getDueStatus({ done: false, dueDate: '2026-11-12' }, FAKE_TODAY)).toBe('scheduled');
+  });
+
+  it('is "none" for an invalid date string', () => {
+    expect(getDueStatus({ done: false, dueDate: 'soon' }, FAKE_TODAY)).toBe('none');
+    expect(getDueStatus({ done: false, dueDate: '2026-02-30' }, FAKE_TODAY)).toBe('none');
   });
 
   it('never marks a done task as overdue or due today', () => {
@@ -104,5 +114,7 @@ describe('getDueLabel', () => {
     expect(getDueLabel({ done: false, dueDate: '2026-11-20' }, FAKE_TODAY)).toBe('Due 20 Nov 2026');
     expect(getDueLabel({ done: true, dueDate: '2026-11-05' }, FAKE_TODAY)).toBe('Due 5 Nov 2026');
     expect(getDueLabel({ done: false, dueDate: null }, FAKE_TODAY)).toBe('No due date');
+    expect(getDueLabel({ done: false, dueDate: '2026-11-11' }, FAKE_TODAY)).toBe('Due tomorrow');
+    expect(getDueLabel({ done: false, dueDate: 'soon' }, FAKE_TODAY)).toBe('Unknown date (soon)');
   });
 });

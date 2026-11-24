@@ -41,3 +41,17 @@ describe("DueBadge", () => {
     await act(async () => undefined);
   });
 });
+
+describe("DueBadge (more cases)", () => {
+  it("says Due tomorrow for the next day", () => {
+    setToday("2026-11-10");
+    render(<DueBadge dueDate="2026-11-11" done={false} />);
+    expect(screen.getByText("Due tomorrow")).toBeInTheDocument();
+  });
+
+  it("shows an unknown-date message for an invalid string", () => {
+    setToday("2026-11-10");
+    render(<DueBadge dueDate="soon" done={false} />);
+    expect(screen.getByText("Unknown date (soon)")).toBeInTheDocument();
+  });
+});

@@ -8,9 +8,11 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "seed": "tsx --conditions=react-server --env-file=.env.local scripts/seed.ts",
     "check": "npm run lint && npm run test && npm run build"
   },
   "dependencies": {
+    "mongoose": "^9.13.1",
     "next": "16.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -28,6 +30,7 @@
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.6",
     "jsdom": "31.0.1",
+    "tsx": "^4.23.15",
     "typescript": "5.9.3",
     "vitest": "5.1.1"
   },

@@ -1,6 +1,5 @@
-import { getSummaryText } from "@/lib/tasks";
-import type { Task } from "@/types";
+import { getSummaryTextFromCounts } from "@/lib/tasks";
 
-export function TaskSummary({ tasks }: { tasks: readonly Task[] }) {
-  return <p className="summary">{getSummaryText(tasks)}</p>;
+export function TaskSummary({ total, done }: { total: number; done: number }) {
+  return <p className="summary">{getSummaryTextFromCounts(done, total)}</p>;
 }

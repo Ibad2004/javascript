@@ -2,20 +2,23 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TaskDetail } from "@/components/TaskDetail";
-import { findSampleTask } from "@/lib/sampleTasks";
+import { getTaskById } from "@/lib/taskData";
+
+// Rendered on every request: tasks are never cached.
+export const dynamic = "force-dynamic";
 
 type Props = { params: Promise<{ id: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const task = findSampleTask((await params).id);
-  if (task === undefined) return { title: "Task not found" };
+  const task = await getTaskById((await params).id);
+  if (task === null) return { title: "Task not found" };
   const chars = Array.from(task.title);
   return { title: chars.length > 50 ? `${chars.slice(0, 50).join("")}…` : task.title };
 }
 
 export default async function TaskPage({ params }: Props) {
-  const task = findSampleTask((await params).id);
-  if (task === undefined) notFound();
+  const task = await getTaskById((await params).id);
+  if (task === null) notFound();
   return (
     <main id="main">
       <p>

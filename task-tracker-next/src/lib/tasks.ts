@@ -31,9 +31,13 @@ export function countDone(tasks: readonly Task[]): number {
 }
 
 /** "3 of 7 done", or "No tasks yet" when the list is empty. */
+export function getSummaryTextFromCounts(done: number, total: number): string {
+  if (total === 0) return 'No tasks yet';
+  return `${done} of ${total} done`;
+}
+
 export function getSummaryText(tasks: readonly Task[]): string {
-  if (tasks.length === 0) return 'No tasks yet';
-  return `${countDone(tasks)} of ${tasks.length} done`;
+  return getSummaryTextFromCounts(countDone(tasks), tasks.length);
 }
 
 /**

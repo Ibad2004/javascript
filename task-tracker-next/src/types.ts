@@ -8,6 +8,9 @@ export type Task = {
   priority: Priority;
   /** Date-only string in the form "YYYY-MM-DD", or null when there is no due date. */
   dueDate: string | null;
+  /** ISO timestamps from the database (absent on tasks made in the browser). */
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 /** The fields a user can type in. Everything else (id, done) is set by the app. */

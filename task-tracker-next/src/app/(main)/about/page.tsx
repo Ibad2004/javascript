@@ -16,8 +16,8 @@ export default function AboutPage() {
         <h2>Client components</h2>
         <p>
           A file that starts with &quot;use client&quot; runs in the browser too. We use this only
-          where we need state, events or browser APIs: the search box, the filter buttons and the
-          add-task form.
+          where we need state, events or browser APIs: the search box, the filter buttons, the task
+          forms, the done checkboxes and the delete dialog.
         </p>
         <h2>Rule of thumb</h2>
         <p>Stay on the server until the component needs interaction.</p>

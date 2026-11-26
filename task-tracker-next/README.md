@@ -1,7 +1,7 @@
-# Task Tracker in Next.js (Day 22)
+# Task Tracker in Next.js (Day 23)
 
 The Week 3 task tracker rebuilt with the Next.js App Router. Today: routing, layouts, server vs client components.
-Tasks now come from MongoDB Atlas, read directly in server components. Server actions come on Day 23, auth on Day 24, deploy on Day 25.
+Tasks now come from MongoDB Atlas, read directly in server components. Day 23 adds create, edit, done and delete with server actions. Auth comes on Day 24, deploy on Day 25.
 
 ## Run
 Needs Node 20.19 or newer.
@@ -32,10 +32,11 @@ Server by default. A client file starts with `"use client"` and one comment line
 | Component | Kind | Why |
 |---|---|---|
 | Pages, layouts, `Header` | server | Static markup and data; no state or events. |
-| `TaskList`, `TaskItem`, `TaskSummary`, `TaskDetail` | server | Only render the filtered sample data; nothing to click. |
+| `TaskList`, `TaskItem`, `TaskSummary`, `TaskDetail` | server | Only render data; the clickable parts are their own client components. |
 | `SearchBox` | client | Typing state, a debounce timer and `router.replace` to update the URL. |
 | `FilterControls` | client | Click and change handlers that change the URL through the router. |
-| `AddTaskForm` | client | Controlled inputs, validation and focus (not saving yet). |
+| `AddTaskForm`, `TaskForm`, `TaskEditor` | client | Controlled inputs, pending state, focus and the edit mode. |
+| `TaskToggle`, `DeleteTaskButton`, `ActionError` | client | Call server actions from events; open the dialog; refresh. |
 | `PasswordField` | client | Show/hide toggle is state on the input type. |
 | `DueBadge` | client | "Overdue" / "Due today" need the visitor's local date, not the server's. The server renders the plain date; the badge appears after mount, so there is no hydration mismatch. |
 | `useFilterUrl`, `useLocalToday` | client hooks | Use `next/navigation` and the browser clock. |
@@ -85,3 +86,34 @@ Filters (status, priority, search) run **in the database query**. The search tex
 - `server-only` throws outside Next.js, so the seed script runs with `tsx --conditions=react-server`.
 - `.gitignore` had `.env*`, which also hid `.env.example`; I added `!.env.example`.
 - The old `sampleTasks.ts` is removed. `TaskSummary` and the filter counts now use database counts (`getTaskCounts`).
+
+## Day 23: server actions (create, edit, toggle, delete)
+
+### What is a server action?
+An async function in a `"use server"` file. A client component imports and calls it like a normal function, but Next.js sends a `POST` request and the function runs **on the server**. There is no API route and no Express. `revalidatePath` inside the action makes the same response carry the freshly rendered page.
+
+An action is a public endpoint: anyone can send that `POST` with any data. The checks in the form are only for the user's comfort, so **every action checks everything again**.
+
+### How this app uses them
+| Action (`src/app/actions/tasks.ts`) | Checks | Then |
+|---|---|---|
+| `createTask(input)` | zod schema | `insertTask` |
+| `updateTask(id, input)` | id, then zod schema | `saveTask` (the four edited fields only, so `done` is kept) |
+| `toggleTask(id)` | id | `toggleTaskDone` (flips in one database step) |
+| `deleteTask(id, redirectToList?)` | id | `removeTask`; redirects to `/tasks` only when the second value is exactly `true` |
+
+- Flow: component → action (validate) → `src/lib/taskData.ts` (database, server-only) → `revalidatePath("/tasks")` and `revalidatePath("/tasks/<id>")`.
+- The answer is always `{ ok: true }` or `{ ok: false, message, fieldErrors? }`. A database error becomes "Could not save your change. Please try again."; only the error's name is logged.
+- An invalid or missing id gives "This task no longer exists."
+- `src/lib/taskSchema.ts` (server-only, zod): title trimmed, 1 to 100 characters; description up to 500; priority `low|medium|high`; due date `""` or a real `YYYY-MM-DD` date. It uses the same limits and character counting as the form (`src/lib/tasks.ts`). Unknown fields are dropped.
+- `TaskForm` (add and edit) uses `useActionState`: "Saving…", a disabled button and a lock against double submits. It submits with `onSubmit`, so a failed save keeps the typed text. `callAction` also covers a request that never reaches the server.
+- The done checkbox uses `aria-disabled` while saving, so the keyboard focus stays on it.
+- Delete asks first in a modal `<dialog>`: Escape or Cancel returns the focus to the Delete button. After deleting from the list, the focus moves to the "Your tasks" heading.
+- If a task was deleted in another tab, the message stays on screen. A **Refresh** button next to a failed toggle or delete then updates the page.
+
+There is no login yet (Day 24), so anyone who can open the app can change the tasks. Do not deploy it before then.
+
+### What broke on Day 23
+- Mongoose `maxlength` counts UTF-16 units, but the form counts characters. A title of 60 emoji passed the form and would have failed in the database. The model now uses a validator with the same `countChars`.
+- After deleting from the list, the focus fell to `<body>`: the dialog's `close` event arrives later and moved the focus back to the Delete button of the row that was being removed. `onClose` now returns the focus only when nothing was deleted. The unit tests did not catch it; a check in a real browser did.
+- `<form action={...}>` resets the form after the action in React 19, so I submit with `onSubmit` and `startTransition` instead.

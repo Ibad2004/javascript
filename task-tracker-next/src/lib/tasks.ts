@@ -178,6 +178,8 @@ export const MESSAGES = {
   titleTooLong: `Title must be ${TITLE_MAX} characters or less`,
   descriptionTooLong: `Description must be ${DESCRIPTION_MAX} characters or less`,
   invalidDate: 'Enter a valid date',
+  invalidDescription: 'Description must be text',
+  invalidPriority: 'Choose low, medium or high',
   pastDate: 'This date is in the past',
   duplicateTitle: 'A task with this title already exists',
 } as const;

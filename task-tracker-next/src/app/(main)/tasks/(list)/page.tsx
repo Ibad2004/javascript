@@ -21,7 +21,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   return (
     <main id="main" className="list-page">
       <section className="panel" aria-labelledby="list-heading">
-        <h1 id="list-heading">Your tasks</h1>
+        <h1 id="list-heading" tabIndex={-1}>
+          Your tasks
+        </h1>
         <TaskSummary total={counts.all} done={counts.done} />
         <div className="filters">
           <FilterControls counts={counts} />

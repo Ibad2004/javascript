@@ -4,6 +4,9 @@ import { PasswordField } from "./PasswordField";
 import { TaskList } from "./TaskList";
 import { makeTask } from "@/test/makeTask";
 
+// TaskItem has buttons that import the server actions and use the router.
+vi.mock("@/app/actions/tasks", () => ({ toggleTask: vi.fn(), deleteTask: vi.fn() }));
+
 describe("PasswordField", () => {
   it("toggles between hidden and visible", async () => {
     render(<PasswordField autoComplete="current-password" />);

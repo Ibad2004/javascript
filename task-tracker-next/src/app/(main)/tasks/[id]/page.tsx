@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TaskDetail } from "@/components/TaskDetail";
+import { TaskEditor } from "@/components/TaskEditor";
 import { getTaskById } from "@/lib/taskData";
 
 // Rendered on every request: tasks are never cached.
@@ -28,7 +29,9 @@ export default async function TaskPage({ params }: Props) {
         <h1 id="task-heading" dir="auto">
           {task.title}
         </h1>
-        <TaskDetail task={task} />
+        <TaskEditor key={task.id} task={task}>
+          <TaskDetail task={task} />
+        </TaskEditor>
       </section>
     </main>
   );

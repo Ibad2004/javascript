@@ -1,11 +1,17 @@
 import "server-only";
 import mongoose, { Schema, model, type InferSchemaType, type Model } from "mongoose";
-import { DESCRIPTION_MAX, TITLE_MAX } from "@/lib/tasks";
+import { DESCRIPTION_MAX, TITLE_MAX, countChars } from "@/lib/tasks";
+
+// Not `maxlength`: it counts UTF-16 units, so 60 emoji would be "120 long" although the form says 60.
+const maxChars = (max: number) => ({
+  validator: (value: string) => countChars(value) <= max,
+  message: `{PATH} must be ${max} characters or less`,
+});
 
 const taskSchema = new Schema(
   {
-    title: { type: String, required: true, trim: true, maxlength: TITLE_MAX },
-    description: { type: String, default: "", trim: true, maxlength: DESCRIPTION_MAX },
+    title: { type: String, required: true, trim: true, validate: maxChars(TITLE_MAX) },
+    description: { type: String, default: "", trim: true, validate: maxChars(DESCRIPTION_MAX) },
     done: { type: Boolean, default: false },
     priority: { type: String, enum: ["low", "medium", "high"], default: "medium" },
     /** Date-only "YYYY-MM-DD" (a calendar day, not a moment), or null. */

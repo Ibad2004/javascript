@@ -1,10 +1,15 @@
 import mongoose from "mongoose";
 import { connectDb } from "../src/lib/db";
 import { addDays, toLocalDateString } from "../src/lib/dates";
+import { BCRYPT_COST, hashPassword } from "../src/lib/password";
 import type { TaskInput } from "../src/types";
 import { TaskModel } from "../src/models/Task";
+import { UserModel } from "../src/models/User";
 
 const EXPECTED_DB = "task-tracker-next";
+// A public demo account for local testing, printed in the README. Never a real password.
+const DEMO_EMAIL = "demo@example.com";
+const DEMO_PASSWORD = "DemoPass123";
 
 async function main(): Promise<void> {
   await connectDb();
@@ -28,9 +33,18 @@ async function main(): Promise<void> {
     { title: "Plan the weekend trip with a really long title that keeps going to check wrapping on a 320px screen", description: "", done: true, priority: "low", dueDate: null },
   ];
 
-  const removed = await TaskModel.deleteMany({});
-  const inserted = await TaskModel.insertMany(tasks);
-  console.log(`Seeded "${name}": deleted ${removed.deletedCount}, inserted ${inserted.length}.`);
+  await Promise.all([UserModel.init(), TaskModel.init()]); // creates the indexes
+  const passwordHash = await hashPassword(DEMO_PASSWORD);
+  const demo = await UserModel.findOneAndUpdate(
+    { email: DEMO_EMAIL },
+    { $set: { passwordHash } },
+    { upsert: true, returnDocument: "after" },
+  ).orFail();
+
+  // Only the demo user's tasks and old tasks from before Day 24 (no owner). Other users keep theirs.
+  const removed = await TaskModel.deleteMany({ $or: [{ owner: demo._id }, { owner: { $exists: false } }] });
+  const inserted = await TaskModel.insertMany(tasks.map((task) => ({ ...task, owner: demo._id })));
+  console.log(`Seeded "${name}": deleted ${removed.deletedCount}, inserted ${inserted.length} for ${DEMO_EMAIL} (bcrypt cost ${BCRYPT_COST}).`);
 }
 
 main()

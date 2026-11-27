@@ -14,3 +14,9 @@ export function parseSearchParams(raw: RawSearchParams): Filters {
   }
   return readFilters(params);
 }
+
+/** The raw `?next=` value (first one wins). It is NOT safe yet: pass it to safeNextPath. */
+export function parseNextParam(raw: RawSearchParams): string | undefined {
+  const value = raw.next;
+  return Array.isArray(value) ? value[0] : value;
+}

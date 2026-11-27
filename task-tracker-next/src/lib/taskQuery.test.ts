@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_FILTERS } from './filters';
-import { buildTaskQuery, escapeRegex, isObjectIdString, serializeTask } from './taskQuery';
+import { buildTaskQuery, escapeRegex, isObjectIdString, ownedTask, serializeTask } from './taskQuery';
 
 describe('escapeRegex', () => {
   it('escapes every special character', () => {
@@ -17,18 +17,24 @@ describe('escapeRegex', () => {
 });
 
 describe('buildTaskQuery', () => {
-  it('is empty for the default filters', () => {
-    expect(buildTaskQuery(DEFAULT_FILTERS)).toEqual({});
+  it('has only the owner for the default filters', () => {
+    expect(buildTaskQuery('u1', DEFAULT_FILTERS)).toEqual({ owner: 'u1' });
   });
   it('maps status and priority', () => {
-    expect(buildTaskQuery({ ...DEFAULT_FILTERS, status: 'done' })).toEqual({ done: true });
-    expect(buildTaskQuery({ ...DEFAULT_FILTERS, status: 'pending', priority: 'high' })).toEqual({ done: false, priority: 'high' });
+    expect(buildTaskQuery('u1', { ...DEFAULT_FILTERS, status: 'done' })).toEqual({ owner: 'u1', done: true });
+    expect(buildTaskQuery('u1', { ...DEFAULT_FILTERS, status: 'pending', priority: 'high' })).toEqual({ owner: 'u1', done: false, priority: 'high' });
   });
   it('turns the search into an escaped, case-insensitive regex', () => {
-    expect(buildTaskQuery({ ...DEFAULT_FILTERS, q: '  C++  Tem ' })).toEqual({ title: { $regex: String.raw`c\+\+ tem`, $options: 'i' } });
+    expect(buildTaskQuery('u1', { ...DEFAULT_FILTERS, q: '  C++  Tem ' })).toEqual({ owner: 'u1', title: { $regex: String.raw`c\+\+ tem`, $options: 'i' } });
   });
   it('ignores a search of only spaces', () => {
-    expect(buildTaskQuery({ ...DEFAULT_FILTERS, q: '   ' })).toEqual({});
+    expect(buildTaskQuery('u1', { ...DEFAULT_FILTERS, q: '   ' })).toEqual({ owner: 'u1' });
+  });
+});
+
+describe('ownedTask', () => {
+  it('always matches on the id and the owner together', () => {
+    expect(ownedTask('u1', 't1')).toEqual({ _id: 't1', owner: 'u1' });
   });
 });
 

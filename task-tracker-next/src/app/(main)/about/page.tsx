@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { requirePageUser } from "@/lib/session";
 
 export const metadata: Metadata = { title: "About" };
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  await requirePageUser("/about");
   return (
     <main id="main">
       <section className="panel" aria-labelledby="about-heading">

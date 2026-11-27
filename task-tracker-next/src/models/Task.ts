@@ -10,6 +10,8 @@ const maxChars = (max: number) => ({
 
 const taskSchema = new Schema(
   {
+    /** The user who may see and change this task. */
+    owner: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     title: { type: String, required: true, trim: true, validate: maxChars(TITLE_MAX) },
     description: { type: String, default: "", trim: true, validate: maxChars(DESCRIPTION_MAX) },
     done: { type: Boolean, default: false },

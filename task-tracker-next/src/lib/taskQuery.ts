@@ -7,14 +7,15 @@ export function escapeRegex(text: string): string {
 }
 
 export type TaskQuery = {
+  owner: string;
   done?: boolean;
   priority?: Priority;
   title?: { $regex: string; $options: "i" };
 };
 
-/** The MongoDB filter for the URL filters. The database does the filtering. */
-export function buildTaskQuery(filters: Filters): TaskQuery {
-  const query: TaskQuery = {};
+/** The MongoDB filter for one user's tasks and the URL filters. The database does the filtering. */
+export function buildTaskQuery(ownerId: string, filters: Filters): TaskQuery {
+  const query: TaskQuery = { owner: ownerId };
   if (filters.status !== "all") query.done = filters.status === "done";
   if (filters.priority !== "any") query.priority = filters.priority;
   const needle = normalizeSearch(filters.q);
@@ -25,6 +26,11 @@ export function buildTaskQuery(filters: Filters): TaskQuery {
 /** 24 hex characters. (mongoose.isValidObjectId also accepts any 12-character string.) */
 export function isObjectIdString(id: string): boolean {
   return /^[0-9a-f]{24}$/i.test(id);
+}
+
+/** One task, only if this user owns it. Another user's id matches nothing, like a missing one. */
+export function ownedTask(ownerId: string, id: string): { _id: string; owner: string } {
+  return { _id: id, owner: ownerId };
 }
 
 /** The shape of a `.lean()` document, as far as we use it. */

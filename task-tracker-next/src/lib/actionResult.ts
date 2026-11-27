@@ -1,4 +1,5 @@
 // What every server action answers with. No server-only code here: the browser uses it too.
+import { unstable_rethrow } from "next/navigation";
 import type { TaskValidation } from "@/lib/tasks";
 
 /** The same shape the form already shows, plus priority (only a hand-made request can break it). */
@@ -34,6 +35,7 @@ export async function runSafely(work: () => Promise<ActionResult>): Promise<Acti
   try {
     return await work();
   } catch (error) {
+    unstable_rethrow(error); // requireUser() redirects by throwing
     console.error("Task action failed:", error instanceof Error ? error.name : "unknown error");
     return saveFailed();
   }

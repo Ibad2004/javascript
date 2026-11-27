@@ -577,6 +577,13 @@
   font-size: var(--text-sm);
 }
 
+/* A long email wraps instead of pushing the header wider than a phone. */
+.account-email {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--text-sm);
+}
+
 /* Edge draws its own reveal/clear icons inside password inputs: only our toggle stays. */
 input[type='password']::-ms-reveal,
 input[type='password']::-ms-clear {

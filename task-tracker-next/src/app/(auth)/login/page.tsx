@@ -1,28 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { PasswordField } from "@/components/PasswordField";
+import { redirect } from "next/navigation";
+import { login } from "@/app/actions/auth";
+import { AuthForm } from "@/components/AuthForm";
+import { DEFAULT_NEXT, safeNextPath } from "@/lib/safeNext";
+import { parseNextParam, type RawSearchParams } from "@/lib/searchParams";
+import { getCurrentUser } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Log in" };
 
-export default function Page() {
+export default async function Page({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+  if ((await getCurrentUser()) !== null) redirect(DEFAULT_NEXT);
+  const next = safeNextPath(parseNextParam(await searchParams));
+
   return (
     <main id="main" className="auth-page">
       <section className="panel" aria-labelledby="auth-heading">
         <h1 id="auth-heading">Log in</h1>
-        <p className="notice-info">Login is coming later. This form does not work yet.</p>
-        <form className="task-form" noValidate>
-          <label htmlFor="auth-email">Email</label>
-          <input id="auth-email" name="email" type="email" autoComplete="username" />
-          <PasswordField autoComplete="current-password" />
-          <div className="form-buttons">
-            <button type="submit" className="button-primary" disabled>
-              Log in
-            </button>
-          </div>
-        </form>
-        <p>No account yet? <Link href="/signup">Sign up</Link></p>
+        <AuthForm action={login} mode="login" next={next} />
         <p>
-          <Link href="/tasks">Back to tasks</Link>
+          No account yet? <Link href={`/signup?next=${encodeURIComponent(next)}`}>Sign up</Link>
         </p>
       </section>
     </main>

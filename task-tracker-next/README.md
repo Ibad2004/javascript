@@ -1,8 +1,8 @@
-# Task Tracker in Next.js (Day 24)
+# Task Tracker in Next.js (Day 25)
 
 The Week 3 task tracker rebuilt with the Next.js App Router. Today: routing, layouts, server vs client components.
-Tasks now come from MongoDB Atlas, read directly in server components. Day 23 adds create, edit, done and delete with server actions. Day 24 adds sign up, log in, log out and per-user tasks. Deploy comes on Day 25.
-The Day 21 to 23 sections describe the app as it was on that day; where they differ, the Day 24 section is current.
+Tasks now come from MongoDB Atlas, read directly in server components. Day 23 adds create, edit, done and delete with server actions. Day 24 adds sign up, log in, log out and per-user tasks. Day 25 makes it ready to deploy on Vercel.
+Each day's section describes the app as it was on that day; where they differ, the later section is current.
 
 ## Run
 Needs Node 20.19 or newer.
@@ -158,7 +158,7 @@ The cookie is `session`: `httpOnly`, `sameSite=lax`, `secure` in production, `pa
 - bcrypt cost 12. A password is 8 or more characters, at most 72 **bytes** (bcrypt ignores the rest) and not only spaces.
 - An unknown email and a wrong password give the same "Email or password is incorrect". An unknown email is compared with a dummy hash, so the timing is similar.
 - Sign up does say that an email is taken, so it can be used to find registered emails. Hiding that needs email verification.
-- After 5 failed logins for one email within 15 minutes: "Too many attempts, try again later". The attempt is counted before the password check, so parallel requests cannot slip past. **Limits:** it is in memory (lost on restart, not shared between servers, so not enough for a serverless deploy), anyone can lock out someone else's email for 15 minutes, it does not limit one attacker trying many emails, and sign up is not limited.
+- (Replaced on Day 25.) After 5 failed logins for one email within 15 minutes: "Too many attempts, try again later". The attempt is counted before the password check, so parallel requests cannot slip past. **Limits:** it is in memory (lost on restart, not shared between servers, so not enough for a serverless deploy), anyone can lock out someone else's email for 15 minutes, it does not limit one attacker trying many emails, and sign up is not limited.
 - The login and signup forms use `<form action>`, so a submit before the JavaScript has loaded is still a POST, never a URL with the password in it.
 
 `/about` is now rendered on demand (it reads the cookie), so the Day 22 "static" row now applies to none of the app's pages.
@@ -170,3 +170,52 @@ The final HTTP checks all passed. Most of these are traps found while reading th
 - An error in a layout skips `(main)/error.tsx`. Because the header now reads the user from the database, it catches that error and hides the account area, so the page's own error screen still works.
 - Tasks created before today had no owner, so no user could see them. The seed removes them.
 - The old `buildTaskQuery` tests stopped type-checking once the owner became a required argument. That is the point of making it required: no call can silently leave it out.
+
+## Day 25: ready for production
+
+### Limits shared by all server instances
+Vercel can run many instances and restart them at any time, so the counters are now in MongoDB (collection `loginattempts`), not in memory.
+
+| Limit | Key | Rule |
+|---|---|---|
+| Failed logins | lowercased email + client address | 5 per 15 minutes, then "Too many attempts, try again later". A successful login clears that key. |
+| Sign-ups | client address | 10 per hour, then "Too many sign-ups from your network. Please try again in an hour." |
+
+- Each counter has `key` (unique index), `count` and `expiresAt` (TTL index: MongoDB deletes old counters).
+- An attempt is counted in **one** database step before the password is checked, so parallel requests on different instances cannot slip past. If the counter cannot be saved, no password is checked.
+- The window starts at the first attempt (Day 24 used a sliding window). Blocked tries do not extend it. The TTL cleanup runs only about once a minute, so the update itself also treats an expired counter as new.
+- Sign-up attempts with valid input count, including ones for an email that is already taken.
+- The client address is the first `x-forwarded-for` value, or `unknown`. Vercel sets this header itself. On a host that passes on the caller's own header, it could be faked.
+- A stranger on another network cannot block your login. The trade-off: someone with many addresses gets 5 guesses from each. People who share one address (a school or office) also share the sign-up limit.
+- Unchanged: an unknown email and a wrong password give the same message after the same bcrypt work.
+
+Files: `src/models/LoginAttempt.ts`, `src/lib/attemptData.ts` (database), `src/lib/loginLimiter.ts` (rules), `src/lib/clientIp.ts`. The unit tests mock the database.
+
+### Production safety
+- `src/instrumentation.ts` runs `checkEnv()` when a server instance starts. A missing `MONGODB_URI`, or an `AUTH_SECRET` that is missing or under 32 characters, stops it with a message in the server log that names the variable, never its value. The same check runs again where each value is used.
+- The seed runs only on a database named exactly `task-tracker-next` (`src/lib/seedGuard.ts`, tested), so the demo account cannot be seeded into `task-tracker-next-prod`. Someone could still sign up with that email by hand, so do not.
+- Error screens show a fixed message, never the error. `src/app/error.tsx` covers pages outside `(main)`, such as `/login`, and `src/app/global-error.tsx` covers the root layout. Details go only to the server log.
+- The session cookie is `secure` in production, and no code depends on `localhost`.
+
+## Deploy to Vercel
+Live: <link coming>
+
+1. In Vercel, import the repository and set **Root Directory** to `task-tracker-next`. Keep the Next.js preset and the default build settings.
+2. Add two environment variables for **Production**:
+
+   | Name | Value |
+   |---|---|
+   | `MONGODB_URI` | Your Atlas connection string with the database name `task-tracker-next-prod`: `...mongodb.net/task-tracker-next-prod?retryWrites=true&w=majority` |
+   | `AUTH_SECRET` | A **new** random value, not the one on your computer (command below). |
+
+   ```
+   node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+   ```
+   Type the values only into Vercel. Do not add them to a file in the repository.
+3. In Atlas, open **Network Access**. Vercel's outgoing addresses change, so a normal setup needs `0.0.0.0/0` (any address). The database password is then the main protection: use a long random one, and preferably a separate database user that only has `readWrite` on `task-tracker-next-prod`.
+4. Deploy, then sign up for a new account on the live site. **Do not run the seed** against the live database: the demo password is public.
+
+If you change a variable, redeploy. Preview deployments get no variables from step 2, so they fail the startup check; if you want previews, give them their own database and secret.
+
+### What broke on Day 25
+Nothing in the app broke in the final checks. One check of my own was wrong at first: I tested the counter on Atlas with a 1.5 second window, and the counts started again halfway, because the calls together took longer than the window. With a 20 second window it counted up to 6, stayed there, and started again at 1 after the window.

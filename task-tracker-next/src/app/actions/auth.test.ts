@@ -1,17 +1,24 @@
 // @vitest-environment node
 import { login, logout, signup } from "@/app/actions/auth";
+import { countAttempt, deleteAttempts } from "@/lib/attemptData";
 import { AUTH_MESSAGES } from "@/lib/authResult";
-import { loginLimiter } from "@/lib/loginLimiter";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { createSession, deleteSession } from "@/lib/session";
 import { findLoginByEmail, insertUser } from "@/lib/userData";
+import { fakeAttemptStore } from "@/test/fakeAttemptStore";
 
+const request = vi.hoisted(() => ({ forwardedFor: "" }));
+
+vi.mock("next/headers", () => ({ headers: async () => new Headers({ "x-forwarded-for": request.forwardedFor }) }));
+vi.mock("@/lib/attemptData", () => ({ countAttempt: vi.fn(), deleteAttempts: vi.fn() }));
 vi.mock("@/lib/password", () => ({ hashPassword: vi.fn(), verifyPassword: vi.fn() }));
 vi.mock("@/lib/session", () => ({ createSession: vi.fn(), deleteSession: vi.fn() }));
 vi.mock("@/lib/userData", () => ({ findLoginByEmail: vi.fn(), insertUser: vi.fn() }));
 
 const ID = "0123456789abcdef01234567";
 const EMAIL = "a@example.com";
+const IP = "203.0.113.7";
+const attempts = fakeAttemptStore();
 
 function form(email: string, password: string, next?: string): FormData {
   const data = new FormData();
@@ -27,7 +34,10 @@ const redirectTo = (url: string) => ({ digest: expect.stringContaining(`;${url};
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubEnv("AUTH_SECRET", "test-only-secret-that-is-long-enough-123456");
-  loginLimiter.clear(EMAIL);
+  attempts.reset();
+  request.forwardedFor = `${IP}, 10.0.0.1`;
+  vi.mocked(countAttempt).mockImplementation(attempts.countAttempt);
+  vi.mocked(deleteAttempts).mockImplementation(attempts.deleteAttempts);
   vi.mocked(hashPassword).mockResolvedValue("hashed");
   vi.mocked(insertUser).mockResolvedValue(ID);
   vi.mocked(findLoginByEmail).mockResolvedValue({ id: ID, passwordHash: "stored" });
@@ -57,6 +67,20 @@ describe("signup", () => {
     await expect(signup({}, form("bad", "short"))).resolves.toHaveProperty("fieldErrors");
     await expect(signup({}, { email: EMAIL, password: "long enough" })).resolves.toHaveProperty("fieldErrors");
     expect(insertUser).not.toHaveBeenCalled();
+  });
+
+  it("blocks the 11th sign-up from one address, before any hashing", async () => {
+    vi.mocked(insertUser).mockResolvedValue(null);
+    for (let i = 0; i < 10; i += 1) await signup({}, form(EMAIL, "long enough"));
+    await expect(signup({}, form(EMAIL, "long enough"))).resolves.toEqual({
+      message: AUTH_MESSAGES.tooManySignups,
+      email: EMAIL,
+    });
+    expect(hashPassword).toHaveBeenCalledTimes(10);
+    expect(insertUser).toHaveBeenCalledTimes(10);
+
+    request.forwardedFor = "198.51.100.2";
+    await expect(signup({}, form(EMAIL, "long enough"))).resolves.toHaveProperty("fieldErrors");
   });
 
   it("creates no account when AUTH_SECRET is too short", async () => {
@@ -98,6 +122,26 @@ describe("login", () => {
     vi.mocked(verifyPassword).mockResolvedValue(false);
     await Promise.all(Array.from({ length: 20 }, () => login({}, form(EMAIL, "pw"))));
     expect(verifyPassword).toHaveBeenCalledTimes(5);
+  });
+
+  it("does not let one address block the same email for another", async () => {
+    vi.mocked(verifyPassword).mockResolvedValue(false);
+    for (let i = 0; i < 6; i += 1) await login({}, form(EMAIL, "pw"));
+    request.forwardedFor = "198.51.100.2";
+    vi.mocked(verifyPassword).mockResolvedValue(true);
+    await expect(login({}, form(EMAIL, "pw"))).rejects.toMatchObject(redirectTo("/tasks"));
+  });
+
+  it("clears the key of this email and address after a successful login", async () => {
+    await expect(login({}, form(" A@Example.com ", "pw"))).rejects.toMatchObject(redirectTo("/tasks"));
+    expect(deleteAttempts).toHaveBeenCalledWith(`login:${EMAIL}|${IP}`);
+  });
+
+  it("checks no password when the limiter cannot reach the database", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.mocked(countAttempt).mockRejectedValue(new Error("secret host"));
+    await expect(login({}, form(EMAIL, "pw"))).resolves.toEqual({ message: AUTH_MESSAGES.failed, email: EMAIL });
+    expect(verifyPassword).not.toHaveBeenCalled();
   });
 
   it("hides database errors", async () => {

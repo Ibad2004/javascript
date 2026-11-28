@@ -1,10 +1,12 @@
 "use server";
 // Sign up, log in, log out. Anyone can call these with any data.
 
+import { headers } from "next/headers";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { AUTH_MESSAGES, type AuthState } from "@/lib/authResult";
 import { loginSchema, parseCredentials, signupSchema } from "@/lib/authSchema";
-import { loginLimiter } from "@/lib/loginLimiter";
+import { clientIp } from "@/lib/clientIp";
+import { clearLoginAttempts, tryLoginAttempt, trySignupAttempt } from "@/lib/loginLimiter";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { safeNextPath } from "@/lib/safeNext";
 import { createSession, deleteSession } from "@/lib/session";
@@ -28,6 +30,10 @@ function failed(error: unknown, email: string): AuthState {
   return { message: AUTH_MESSAGES.failed, email };
 }
 
+async function requestIp(): Promise<string> {
+  return clientIp((await headers()).get("x-forwarded-for"));
+}
+
 export async function signup(_previous: AuthState, formData: unknown): Promise<AuthState> {
   const { raw, email, next } = readForm(formData);
   const parsed = parseCredentials(signupSchema, raw);
@@ -35,6 +41,8 @@ export async function signup(_previous: AuthState, formData: unknown): Promise<A
 
   getSessionKey(); // fail clearly BEFORE an account is created that could not be logged in
   try {
+    // Counted before hashing: it also limits bcrypt work and guessing which emails exist.
+    if (!(await trySignupAttempt(await requestIp()))) return { message: AUTH_MESSAGES.tooManySignups, email };
     const userId = await insertUser(parsed.data.email, await hashPassword(parsed.data.password));
     if (userId === null) return { fieldErrors: { email: AUTH_MESSAGES.emailTaken }, email };
     await createSession(userId);
@@ -51,13 +59,14 @@ export async function login(_previous: AuthState, formData: unknown): Promise<Au
   if (!parsed.ok) return { fieldErrors: parsed.fieldErrors, email };
 
   getSessionKey();
-  if (!loginLimiter.tryAttempt(parsed.data.email)) return { message: AUTH_MESSAGES.tooManyAttempts, email };
   try {
+    const ip = await requestIp();
+    if (!(await tryLoginAttempt(parsed.data.email, ip))) return { message: AUTH_MESSAGES.tooManyAttempts, email };
     const user = await findLoginByEmail(parsed.data.email);
     // Always compares (with a dummy hash for an unknown email), and gives one message for both cases.
     const matches = await verifyPassword(parsed.data.password, user?.passwordHash ?? null);
     if (user === null || !matches) return { message: AUTH_MESSAGES.wrongCredentials, email };
-    loginLimiter.clear(parsed.data.email);
+    await clearLoginAttempts(parsed.data.email, ip);
     await createSession(user.id);
   } catch (error) {
     return failed(error, email);

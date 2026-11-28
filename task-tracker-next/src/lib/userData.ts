@@ -1,5 +1,6 @@
 import "server-only";
 import { connectDb } from "@/lib/db";
+import { isDuplicateKey } from "@/lib/duplicateKey";
 import { isObjectIdString } from "@/lib/taskQuery";
 import { UserModel } from "@/models/User";
 
@@ -18,10 +19,6 @@ export async function findLoginByEmail(email: string): Promise<{ id: string; pas
   await connectDb();
   const doc = await UserModel.findOne({ email }).select("passwordHash").lean();
   return doc === null ? null : { id: doc._id.toString(), passwordHash: doc.passwordHash };
-}
-
-function isDuplicateKey(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "code" in error && error.code === 11000;
 }
 
 /** Returns the new user's id, or null when the email is already registered. */

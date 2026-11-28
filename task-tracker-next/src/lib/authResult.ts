@@ -18,5 +18,6 @@ export const AUTH_MESSAGES = {
   emailTaken: "An account with this email already exists",
   wrongCredentials: "Email or password is incorrect",
   tooManyAttempts: "Too many attempts, try again later",
+  tooManySignups: "Too many sign-ups from your network. Please try again in an hour.",
   failed: "Something went wrong. Please try again.",
 } as const;

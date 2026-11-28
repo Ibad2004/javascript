@@ -1,47 +1,67 @@
-import { MAX_FAILURES, WINDOW_MS, createLoginLimiter } from "@/lib/loginLimiter";
+// @vitest-environment node
+import { countAttempt, deleteAttempts } from "@/lib/attemptData";
+import {
+  MAX_FAILURES,
+  MAX_SIGNUPS,
+  SIGNUP_WINDOW_MS,
+  WINDOW_MS,
+  clearLoginAttempts,
+  tryLoginAttempt,
+  trySignupAttempt,
+} from "@/lib/loginLimiter";
+import { fakeAttemptStore } from "@/test/fakeAttemptStore";
 
-function setup() {
-  let time = 1_000_000;
-  const limiter = createLoginLimiter(() => time);
-  const fail = (email: string, times: number) => Array.from({ length: times }, () => limiter.tryAttempt(email));
-  return { limiter, fail, wait: (ms: number) => { time += ms; } };
+vi.mock("@/lib/attemptData", () => ({ countAttempt: vi.fn(), deleteAttempts: vi.fn() }));
+
+const IP = "203.0.113.7";
+const OTHER_IP = "198.51.100.2";
+const store = fakeAttemptStore();
+
+async function logins(email: string, ip: string, times: number): Promise<boolean[]> {
+  const results: boolean[] = [];
+  for (let i = 0; i < times; i += 1) results.push(await tryLoginAttempt(email, ip));
+  return results;
 }
 
-describe("login limiter", () => {
-  it("allows 5 attempts and blocks the 6th", () => {
-    const { limiter, fail } = setup();
-    expect(fail("a@x.com", MAX_FAILURES)).toEqual([true, true, true, true, true]);
-    expect(limiter.tryAttempt("a@x.com")).toBe(false);
+beforeEach(() => {
+  vi.resetAllMocks();
+  store.reset();
+  vi.mocked(countAttempt).mockImplementation(store.countAttempt);
+  vi.mocked(deleteAttempts).mockImplementation(store.deleteAttempts);
+});
+
+describe("login limit", () => {
+  it("allows 5 attempts and blocks the 6th", async () => {
+    await expect(logins("a@x.com", IP, MAX_FAILURES + 1)).resolves.toEqual([true, true, true, true, true, false]);
   });
 
-  it("counts each email separately", () => {
-    const { limiter, fail } = setup();
-    fail("a@x.com", MAX_FAILURES);
-    expect(limiter.tryAttempt("b@x.com")).toBe(true);
+  it("uses email + address as the key, with a 15 minute window", async () => {
+    await tryLoginAttempt("a@x.com", IP);
+    expect(countAttempt).toHaveBeenCalledWith(`login:a@x.com|${IP}`, 5, WINDOW_MS);
+    expect(WINDOW_MS).toBe(15 * 60 * 1000);
   });
 
-  it("unblocks after 15 minutes, and blocked tries do not extend the block", () => {
-    const { limiter, fail, wait } = setup();
-    fail("a@x.com", MAX_FAILURES);
-    wait(WINDOW_MS - 1);
-    expect(limiter.tryAttempt("a@x.com")).toBe(false);
-    wait(1);
-    expect(limiter.tryAttempt("a@x.com")).toBe(true);
+  it("does not block the same email from another address, or another email from this one", async () => {
+    await logins("a@x.com", IP, MAX_FAILURES + 1);
+    await expect(tryLoginAttempt("a@x.com", OTHER_IP)).resolves.toBe(true);
+    await expect(tryLoginAttempt("b@x.com", IP)).resolves.toBe(true);
   });
 
-  it("forgets only the failures older than the window", () => {
-    const { fail, wait } = setup();
-    fail("a@x.com", 1);
-    wait(10 * 60 * 1000);
-    fail("a@x.com", 4);
-    wait(5 * 60 * 1000); // the first one is now 15 minutes old
-    expect(fail("a@x.com", 2)).toEqual([true, false]);
+  it("starts again after a successful login, for that key only", async () => {
+    await logins("a@x.com", IP, MAX_FAILURES);
+    await logins("a@x.com", OTHER_IP, MAX_FAILURES);
+    await clearLoginAttempts("a@x.com", IP);
+    await expect(logins("a@x.com", IP, MAX_FAILURES)).resolves.not.toContain(false);
+    await expect(tryLoginAttempt("a@x.com", OTHER_IP)).resolves.toBe(false);
   });
+});
 
-  it("starts again after a successful login", () => {
-    const { limiter, fail } = setup();
-    fail("a@x.com", 4);
-    limiter.clear("a@x.com");
-    expect(fail("a@x.com", MAX_FAILURES)).not.toContain(false);
+describe("sign-up limit", () => {
+  it("allows 10 per address per hour and blocks the 11th", async () => {
+    for (let i = 0; i < MAX_SIGNUPS; i += 1) await expect(trySignupAttempt(IP)).resolves.toBe(true);
+    await expect(trySignupAttempt(IP)).resolves.toBe(false);
+    await expect(trySignupAttempt(OTHER_IP)).resolves.toBe(true);
+    expect(countAttempt).toHaveBeenCalledWith(`signup:${IP}`, 10, SIGNUP_WINDOW_MS);
+    expect(SIGNUP_WINDOW_MS).toBe(60 * 60 * 1000);
   });
 });

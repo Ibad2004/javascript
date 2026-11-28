@@ -1,38 +1,31 @@
-// A simple in-memory limit on failed logins per email. It is lost on restart and is not
-// shared between servers: good enough for learning, not for a deployed app.
+// Limits on logins and sign-ups. The counters are in MongoDB, so they are shared by all
+// server instances and survive a restart.
+import "server-only";
+import { countAttempt, deleteAttempts } from "@/lib/attemptData";
 
 export const MAX_FAILURES = 5;
 export const WINDOW_MS = 15 * 60 * 1000;
-const PRUNE_ABOVE = 10_000;
+export const MAX_SIGNUPS = 10;
+export const SIGNUP_WINDOW_MS = 60 * 60 * 1000;
 
-export function createLoginLimiter(now: () => number = Date.now) {
-  const attempts = new Map<string, number[]>();
+// Email AND address: a stranger on another network cannot lock this person out.
+const loginKey = (email: string, ip: string) => `login:${email}|${ip}`;
+const signupKey = (ip: string) => `signup:${ip}`;
 
-  function recent(email: string): number[] {
-    const since = now() - WINDOW_MS;
-    return (attempts.get(email) ?? []).filter((time) => time > since);
-  }
-
-  return {
-    /**
-     * false = blocked. Otherwise the attempt is counted BEFORE the password is checked, so
-     * many requests sent at the same moment cannot all get past the limit. A correct
-     * password calls clear().
-     */
-    tryAttempt(email: string): boolean {
-      const times = recent(email);
-      if (times.length >= MAX_FAILURES) return false;
-      attempts.set(email, [...times, now()]);
-      // Many made-up emails must not grow the map for ever.
-      if (attempts.size > PRUNE_ABOVE) {
-        for (const key of attempts.keys()) if (recent(key).length === 0) attempts.delete(key);
-      }
-      return true;
-    },
-    clear(email: string): void {
-      attempts.delete(email);
-    },
-  };
+/**
+ * false = blocked. Otherwise the attempt is counted BEFORE the password is checked, so
+ * many requests sent at the same moment cannot all get past the limit. A correct
+ * password calls clearLoginAttempts(). `email` must already be trimmed and lowercased.
+ */
+export async function tryLoginAttempt(email: string, ip: string): Promise<boolean> {
+  return (await countAttempt(loginKey(email, ip), MAX_FAILURES, WINDOW_MS)) <= MAX_FAILURES;
 }
 
-export const loginLimiter = createLoginLimiter();
+export async function clearLoginAttempts(email: string, ip: string): Promise<void> {
+  await deleteAttempts(loginKey(email, ip));
+}
+
+/** false = this address has used up its sign-ups for the hour. */
+export async function trySignupAttempt(ip: string): Promise<boolean> {
+  return (await countAttempt(signupKey(ip), MAX_SIGNUPS, SIGNUP_WINDOW_MS)) <= MAX_SIGNUPS;
+}

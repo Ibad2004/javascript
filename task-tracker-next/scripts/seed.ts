@@ -2,11 +2,11 @@ import mongoose from "mongoose";
 import { connectDb } from "../src/lib/db";
 import { addDays, toLocalDateString } from "../src/lib/dates";
 import { BCRYPT_COST, hashPassword } from "../src/lib/password";
+import { SEED_DB, isSeedableDatabase } from "../src/lib/seedGuard";
 import type { TaskInput } from "../src/types";
 import { TaskModel } from "../src/models/Task";
 import { UserModel } from "../src/models/User";
 
-const EXPECTED_DB = "task-tracker-next";
 // A public demo account for local testing, printed in the README. Never a real password.
 const DEMO_EMAIL = "demo@example.com";
 const DEMO_PASSWORD = "DemoPass123";
@@ -14,8 +14,8 @@ const DEMO_PASSWORD = "DemoPass123";
 async function main(): Promise<void> {
   await connectDb();
   const name = mongoose.connection.name;
-  if (name !== EXPECTED_DB) {
-    console.error(`Aborting: connected to database "${name}", expected "${EXPECTED_DB}". Nothing was deleted.`);
+  if (!isSeedableDatabase(name)) {
+    console.error(`Aborting: connected to database "${name}", expected "${SEED_DB}". Nothing was deleted.`);
     process.exitCode = 1;
     return;
   }

@@ -1,5 +1,6 @@
 import "server-only";
 import mongoose from "mongoose";
+import { readMongoUri } from "./env";
 
 type Cache = { conn: typeof mongoose | null; promise: Promise<typeof mongoose> | null };
 
@@ -17,10 +18,7 @@ mongoose.set("runValidators", true);
 export async function connectDb(): Promise<typeof mongoose> {
   if (cache.conn !== null) return cache.conn;
 
-  const uri = process.env.MONGODB_URI;
-  if (uri === undefined || uri === "") {
-    throw new Error("MONGODB_URI is not set — see .env.example");
-  }
+  const uri = readMongoUri();
 
   cache.promise ??= mongoose.connect(uri, { bufferCommands: false, serverSelectionTimeoutMS: 5000 });
   try {
